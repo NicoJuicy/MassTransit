@@ -3,7 +3,6 @@
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
 
 
@@ -22,12 +21,14 @@
 
             await Task.Delay(50);
 
-            _consumer.Count.ShouldBe(1);
+            Assert.That(_consumer.Count, Is.EqualTo(1));
         }
 
         MyConsumer _consumer;
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<TestMessage>> _accepted;
         Task<ConsumeContext<TestMessage>> _denied;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {

@@ -19,10 +19,10 @@ namespace MassTransit.Tests.Middleware
             {
                 cfg.UseExecuteAsync(async x =>
                 {
-                    await x.OneTimeSetup<Secret<IInputContext>>(async key =>
+                    await x.OneTimeSetup<Secret<IInputContext>>(async () =>
                     {
                         Interlocked.Increment(ref callCount);
-                    }, () => new MySecret<IInputContext>());
+                    });
 
                     Interlocked.Increment(ref totalCount);
                 });
@@ -36,8 +36,11 @@ namespace MassTransit.Tests.Middleware
 
             await Task.WhenAll(tasks);
 
-            Assert.That(callCount, Is.EqualTo(1));
-            Assert.That(totalCount, Is.EqualTo(50));
+            Assert.Multiple(() =>
+            {
+                Assert.That(callCount, Is.EqualTo(1));
+                Assert.That(totalCount, Is.EqualTo(50));
+            });
         }
 
 

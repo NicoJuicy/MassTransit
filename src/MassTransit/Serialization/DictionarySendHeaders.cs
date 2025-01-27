@@ -4,6 +4,7 @@ namespace MassTransit.Serialization
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
 
 
@@ -26,6 +27,22 @@ namespace MassTransit.Serialization
             foreach (KeyValuePair<string, object?> header in headers)
             {
                 if (header.Value != null)
+                    _headers.Add(header.Key, header.Value);
+            }
+        }
+
+        public DictionarySendHeaders(IDictionary<string, object> headers, bool useExistingDictionary)
+        {
+            if (headers == null)
+                throw new ArgumentNullException(nameof(headers));
+
+            if (useExistingDictionary)
+                _headers = headers;
+            else
+            {
+                _headers = new Dictionary<string, object>(headers, StringComparer.OrdinalIgnoreCase);
+
+                foreach (KeyValuePair<string, object> header in headers)
                     _headers.Add(header.Key, header.Value);
             }
         }
@@ -57,7 +74,7 @@ namespace MassTransit.Serialization
                 _headers.Add(key, value);
         }
 
-        public bool TryGetHeader(string key, out object? value)
+        public bool TryGetHeader(string key, [NotNullWhen(true)] out object? value)
         {
             return _headers.TryGetValue(key, out value);
         }
@@ -70,13 +87,13 @@ namespace MassTransit.Serialization
         public T? Get<T>(string key, T? defaultValue)
             where T : class
         {
-            return SystemTextJsonMessageSerializer.Instance.GetValue(_headers, key, defaultValue);
+            return SystemTextJsonMessageSerializer.Instance.GetValue((IReadOnlyDictionary<string, object>)_headers, key, defaultValue);
         }
 
         public T? Get<T>(string key, T? defaultValue)
             where T : struct
         {
-            return SystemTextJsonMessageSerializer.Instance.GetValue(_headers, key, defaultValue);
+            return SystemTextJsonMessageSerializer.Instance.GetValue((IReadOnlyDictionary<string, object>)_headers, key, defaultValue);
         }
 
         public IEnumerator<HeaderValue> GetEnumerator()

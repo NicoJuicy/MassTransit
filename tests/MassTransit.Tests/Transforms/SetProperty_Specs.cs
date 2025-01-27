@@ -2,7 +2,6 @@
 {
     using System.Threading.Tasks;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
 
 
@@ -13,15 +12,20 @@
         [Test]
         public async Task Should_have_the_message_property()
         {
-            await InputQueueSendEndpoint.Send(new A {First = "Hello"});
+            await InputQueueSendEndpoint.Send(new A { First = "Hello" });
 
             ConsumeContext<A> result = await _received;
 
-            result.Message.First.ShouldBe("Hello");
-            result.Message.Second.ShouldBe("World");
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Message.First, Is.EqualTo("Hello"));
+                Assert.That(result.Message.Second, Is.EqualTo("World"));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<A>> _received;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
@@ -53,15 +57,20 @@
         [Test]
         public async Task Should_have_the_message_property()
         {
-            await InputQueueSendEndpoint.Send(new A {First = "Hello"});
+            await InputQueueSendEndpoint.Send(new A { First = "Hello" });
 
             ConsumeContext<A> result = await _received;
 
-            result.Message.First.ShouldBe("Hello");
-            result.Message.Second.ShouldBe("World");
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Message.First, Is.EqualTo("Hello"));
+                Assert.That(result.Message.Second, Is.EqualTo("World"));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<A>> _received;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
@@ -93,21 +102,26 @@
         {
             Task<ConsumeContext<IA>> unmodified = await ConnectPublishHandler<IA>();
 
-            await Bus.Publish(new A {First = "Hello"});
+            await Bus.Publish(new A { First = "Hello" });
 
             ConsumeContext<IA> result = await _received;
             ConsumeContext<IA> original = await unmodified;
             var tweaked = await _tweaked.Task;
 
-            result.Message.First.ShouldBe("Hello");
-            result.Message.Second.ShouldBe("World");
-            tweaked.Second.ShouldBe("World");
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Message.First, Is.EqualTo("Hello"));
+                Assert.That(result.Message.Second, Is.EqualTo("World"));
+                Assert.That(tweaked.Second, Is.EqualTo("World"));
 
-            original.Message.First.ShouldBe("Hello");
-            original.Message.Second.ShouldBe(null);
+                Assert.That(original.Message.First, Is.EqualTo("Hello"));
+                Assert.That(original.Message.Second, Is.Null);
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<IA>> _received;
+        #pragma warning restore NUnit1032
         TaskCompletionSource<IA> _tweaked;
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -150,22 +164,27 @@
         {
             Task<ConsumeContext<IA>> unmodified = await ConnectPublishHandler<IA>();
 
-            await Bus.Publish(new A {First = "Hello"});
+            await Bus.Publish(new A { First = "Hello" });
 
             ConsumeContext<IA> result = await _received;
             ConsumeContext<IA> original = await unmodified;
             var tweaked = await _tweaked.Task;
 
-            result.Message.First.ShouldBe("Hello");
-            result.Message.Second.ShouldBe(null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Message.First, Is.EqualTo("Hello"));
+                Assert.That(result.Message.Second, Is.Null);
 
-            tweaked.Second.ShouldBe("World");
+                Assert.That(tweaked.Second, Is.EqualTo("World"));
 
-            original.Message.First.ShouldBe("Hello");
-            original.Message.Second.ShouldBe(null);
+                Assert.That(original.Message.First, Is.EqualTo("Hello"));
+                Assert.That(original.Message.Second, Is.Null);
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<IA>> _received;
+        #pragma warning restore NUnit1032
         TaskCompletionSource<IA> _tweaked;
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)

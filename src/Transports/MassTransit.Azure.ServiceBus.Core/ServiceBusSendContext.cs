@@ -4,17 +4,13 @@
 
 
     public interface ServiceBusSendContext :
-        SendContext
+        SendContext,
+        PartitionKeySendContext
     {
         /// <summary>
         /// Set the time at which the message should be enqueued, which is essentially scheduling the message for future delivery to the queue.
         /// </summary>
         DateTime? ScheduledEnqueueTimeUtc { set; }
-
-        /// <summary>
-        /// Set the partition key for the message, which is used to split load across nodes in Azure
-        /// </summary>
-        string PartitionKey { set; }
 
         /// <summary>
         /// Set the sessionId of the message
@@ -25,6 +21,11 @@
         /// Set the replyToSessionId of the message
         /// </summary>
         string ReplyToSessionId { set; }
+
+        /// <summary>
+        /// Sets the ReplyTo address of the message
+        /// </summary>
+        string ReplyTo { set; }
 
         /// <summary>
         /// Set the application specific label of the message

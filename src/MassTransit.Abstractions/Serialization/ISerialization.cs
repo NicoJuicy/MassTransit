@@ -1,6 +1,6 @@
-#nullable enable
 namespace MassTransit
 {
+    using System.Diagnostics.CodeAnalysis;
     using System.Net.Mime;
 
 

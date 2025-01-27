@@ -2,7 +2,6 @@
 {
     using System.Threading.Tasks;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
     using TestFramework.Messages;
 
@@ -22,10 +21,12 @@
 
             ConsumeContext<PongMessage> responseContext = await responseHandled;
 
-            responseContext.SourceAddress.ShouldBe(InputQueueAddress);
+            Assert.That(responseContext.SourceAddress, Is.EqualTo(InputQueueAddress));
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _handled;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {

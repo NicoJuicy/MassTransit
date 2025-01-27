@@ -8,7 +8,6 @@
     using MassTransit.Courier.Contracts;
     using MassTransit.Testing;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
     using TestFramework.Courier;
 
@@ -53,13 +52,11 @@
 
             if (faulted.Status == TaskStatus.RanToCompletion)
             {
-                Assert.Fail("Failed due to exception {0}", faulted.Result.Message.ActivityExceptions.Any()
-                    ? faulted.Result.Message.ActivityExceptions.First()
-                        .ExceptionInfo.Message
-                    : "VisitUnknownFilter");
+                Assert.Fail(
+                    $"Failed due to exception {(faulted.Result.Message.ActivityExceptions.Any() ? faulted.Result.Message.ActivityExceptions.First().ExceptionInfo.Message : "VisitUnknownFilter")}");
             }
 
-            completed.Status.ShouldBe(TaskStatus.RanToCompletion);
+            Assert.That(completed.Status, Is.EqualTo(TaskStatus.RanToCompletion));
         }
 
         int _intValue;
@@ -98,13 +95,11 @@
 
             if (faulted.Status == TaskStatus.RanToCompletion)
             {
-                Assert.Fail("Failed due to exception {0}", faulted.Result.Message.ActivityExceptions.Any()
-                    ? faulted.Result.Message.ActivityExceptions.First()
-                        .ExceptionInfo.Message
-                    : "VisitUnknownFilter");
+                Assert.Fail(
+                    $"Failed due to exception {(faulted.Result.Message.ActivityExceptions.Any() ? faulted.Result.Message.ActivityExceptions.First().ExceptionInfo.Message : "VisitUnknownFilter")}");
             }
 
-            completed.Status.ShouldBe(TaskStatus.RanToCompletion);
+            Assert.That(completed.Status, Is.EqualTo(TaskStatus.RanToCompletion));
         }
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)

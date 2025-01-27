@@ -26,7 +26,7 @@ namespace MassTransit.Configuration
 
         public override IEnumerable<T> GetRegistrations<T>(IServiceProvider provider)
         {
-            return provider.GetService<IEnumerable<Bind<IMediator, T>>>().Select(x => x.Value) ?? Array.Empty<T>();
+            return provider.GetService<IEnumerable<Bind<IMediator, T>>>().Select(x => x.Value) ?? [];
         }
 
         protected override void AddRegistration<T>(T value)
@@ -37,10 +37,10 @@ namespace MassTransit.Configuration
         protected override IScopedClientFactory GetScopedBusContext(IServiceProvider provider)
         {
             var clientFactory = provider.GetRequiredService<IScopedMediator>();
-            var consumeContext = provider.GetRequiredService<ScopedConsumeContextProvider>().GetContext();
+            var consumeContextProvider = provider.GetRequiredService<Bind<IMediator, IScopedConsumeContextProvider>>().Value;
 
-            return consumeContext != null
-                ? new ScopedClientFactory(clientFactory, consumeContext)
+            return consumeContextProvider.HasContext
+                ? new ScopedClientFactory(clientFactory, consumeContextProvider.GetContext())
                 : new ScopedClientFactory(new ClientFactory(new ScopedClientFactoryContext(clientFactory, provider)), null);
         }
     }

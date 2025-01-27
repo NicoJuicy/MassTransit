@@ -1,7 +1,7 @@
 namespace MassTransit
 {
-    public interface IEndpointSettings<T>
-        where T : class
+    public interface IEndpointSettings<TConsumer>
+        where TConsumer : class
     {
         string? Name { get; }
 
@@ -13,6 +13,9 @@ namespace MassTransit
 
         bool ConfigureConsumeTopology { get; }
 
-        string? InstanceId { get; set; }
+        string? InstanceId { get; }
+
+        void ConfigureEndpoint<T>(T configurator, IRegistrationContext? context)
+            where T : IReceiveEndpointConfigurator;
     }
 }

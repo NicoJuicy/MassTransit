@@ -31,7 +31,7 @@ namespace MassTransit.AzureServiceBusTransport
         }
 
         public override string EntityName { get; }
-        public override string ActivitySystem => "service-bus";
+        public override string ActivitySystem => "servicebus";
 
         public Task Send(IPipe<SendEndpointContext> pipe, CancellationToken cancellationToken = default)
         {
@@ -148,6 +148,10 @@ namespace MassTransit.AzureServiceBusTransport
             {
                 MassTransit.LogContext.Debug?.Log("CANCEL {DestinationAddress} {TokenId} message not found", EntityName, tokenId);
             }
+            catch (InvalidOperationException exception) when (exception.Message.Contains("already being cancelled"))
+            {
+                MassTransit.LogContext.Debug?.Log("CANCEL {DestinationAddress} {TokenId} message already being canceled", EntityName, tokenId);
+            }
         }
 
         static bool IsCancelScheduledSend<T>(AzureServiceBusSendContext<T> context, out Guid tokenId, out long sequenceNumber)
@@ -196,6 +200,9 @@ namespace MassTransit.AzureServiceBusTransport
 
             if (context.ReplyToSessionId != null)
                 message.ReplyToSessionId = context.ReplyToSessionId;
+
+            if (context.ReplyTo != null)
+                message.ReplyTo = context.ReplyTo;
 
             if (context.Label != null)
                 message.Subject = context.Label;

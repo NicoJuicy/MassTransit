@@ -103,6 +103,9 @@ namespace MassTransit.Transports
             return _endpointObservers.Connect(observer);
         }
 
+        public TimeSpan? ConsumerStopTimeout => _hostConfiguration.ConsumerStopTimeout;
+        public TimeSpan? StopTimeout => _hostConfiguration.StopTimeout;
+
         public Uri InputAddress { get; }
 
         public Task DependenciesReady { get; }

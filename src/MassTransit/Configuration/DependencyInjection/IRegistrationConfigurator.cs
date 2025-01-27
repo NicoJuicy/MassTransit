@@ -13,7 +13,7 @@ namespace MassTransit
         /// </summary>
         /// <param name="configure"></param>
         /// <typeparam name="T">The consumer type</typeparam>
-        IConsumerRegistrationConfigurator<T> AddConsumer<T>(Action<IConsumerConfigurator<T>> configure = null)
+        IConsumerRegistrationConfigurator<T> AddConsumer<T>(Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)
             where T : class, IConsumer;
 
         /// <summary>
@@ -22,7 +22,8 @@ namespace MassTransit
         /// <param name="consumerDefinitionType">The consumer definition type</param>
         /// <param name="configure"></param>
         /// <typeparam name="T">The consumer type</typeparam>
-        IConsumerRegistrationConfigurator<T> AddConsumer<T>(Type consumerDefinitionType, Action<IConsumerConfigurator<T>> configure = null)
+        IConsumerRegistrationConfigurator<T> AddConsumer<T>(Type consumerDefinitionType,
+            Action<IRegistrationContext, IConsumerConfigurator<T>> configure = null)
             where T : class, IConsumer;
 
         /// <summary>
@@ -31,7 +32,7 @@ namespace MassTransit
         /// </summary>
         /// <param name="configure"></param>
         /// <typeparam name="T">The saga type</typeparam>
-        ISagaRegistrationConfigurator<T> AddSaga<T>(Action<ISagaConfigurator<T>> configure = null)
+        ISagaRegistrationConfigurator<T> AddSaga<T>(Action<IRegistrationContext, ISagaConfigurator<T>> configure = null)
             where T : class, ISaga;
 
         /// <summary>
@@ -41,7 +42,7 @@ namespace MassTransit
         /// <param name="sagaDefinitionType">The saga definition type</param>
         /// <param name="configure"></param>
         /// <typeparam name="T">The saga type</typeparam>
-        ISagaRegistrationConfigurator<T> AddSaga<T>(Type sagaDefinitionType, Action<ISagaConfigurator<T>> configure = null)
+        ISagaRegistrationConfigurator<T> AddSaga<T>(Type sagaDefinitionType, Action<IRegistrationContext, ISagaConfigurator<T>> configure = null)
             where T : class, ISaga;
 
         /// <summary>
@@ -51,7 +52,7 @@ namespace MassTransit
         /// <param name="configure"></param>
         /// <typeparam name="TStateMachine"></typeparam>
         /// <typeparam name="T"></typeparam>
-        ISagaRegistrationConfigurator<T> AddSagaStateMachine<TStateMachine, T>(Action<ISagaConfigurator<T>> configure = null)
+        ISagaRegistrationConfigurator<T> AddSagaStateMachine<TStateMachine, T>(Action<IRegistrationContext, ISagaConfigurator<T>> configure = null)
             where TStateMachine : class, SagaStateMachine<T>
             where T : class, SagaStateMachineInstance;
 
@@ -63,7 +64,8 @@ namespace MassTransit
         /// <param name="configure"></param>
         /// <typeparam name="TStateMachine"></typeparam>
         /// <typeparam name="T"></typeparam>
-        ISagaRegistrationConfigurator<T> AddSagaStateMachine<TStateMachine, T>(Type sagaDefinitionType, Action<ISagaConfigurator<T>> configure = null)
+        ISagaRegistrationConfigurator<T> AddSagaStateMachine<TStateMachine, T>(Type sagaDefinitionType,
+            Action<IRegistrationContext, ISagaConfigurator<T>> configure = null)
             where TStateMachine : class, SagaStateMachine<T>
             where T : class, SagaStateMachineInstance;
 
@@ -74,7 +76,7 @@ namespace MassTransit
         /// <typeparam name="TActivity">The activity type</typeparam>
         /// <typeparam name="TArguments">The argument type</typeparam>
         IExecuteActivityRegistrationConfigurator<TActivity, TArguments> AddExecuteActivity<TActivity, TArguments>(
-            Action<IExecuteActivityConfigurator<TActivity, TArguments>> configure = null)
+            Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>> configure = null)
             where TActivity : class, IExecuteActivity<TArguments>
             where TArguments : class;
 
@@ -86,7 +88,7 @@ namespace MassTransit
         /// <typeparam name="TActivity">The activity type</typeparam>
         /// <typeparam name="TArguments">The argument type</typeparam>
         IExecuteActivityRegistrationConfigurator<TActivity, TArguments> AddExecuteActivity<TActivity, TArguments>(Type executeActivityDefinitionType,
-            Action<IExecuteActivityConfigurator<TActivity, TArguments>> configure = null)
+            Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>> configure = null)
             where TActivity : class, IExecuteActivity<TArguments>
             where TArguments : class;
 
@@ -99,8 +101,8 @@ namespace MassTransit
         /// <typeparam name="TArguments">The argument type</typeparam>
         /// <typeparam name="TLog">The log type</typeparam>
         IActivityRegistrationConfigurator<TActivity, TArguments, TLog> AddActivity<TActivity, TArguments, TLog>(
-            Action<IExecuteActivityConfigurator<TActivity, TArguments>> configureExecute = null,
-            Action<ICompensateActivityConfigurator<TActivity, TLog>> configureCompensate = null)
+            Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>> configureExecute = null,
+            Action<IRegistrationContext, ICompensateActivityConfigurator<TActivity, TLog>> configureCompensate = null)
             where TActivity : class, IActivity<TArguments, TLog>
             where TLog : class
             where TArguments : class;
@@ -115,8 +117,8 @@ namespace MassTransit
         /// <typeparam name="TArguments">The argument type</typeparam>
         /// <typeparam name="TLog">The log type</typeparam>
         IActivityRegistrationConfigurator<TActivity, TArguments, TLog> AddActivity<TActivity, TArguments, TLog>(Type activityDefinitionType,
-            Action<IExecuteActivityConfigurator<TActivity, TArguments>> configureExecute = null,
-            Action<ICompensateActivityConfigurator<TActivity, TLog>> configureCompensate = null)
+            Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>> configureExecute = null,
+            Action<IRegistrationContext, ICompensateActivityConfigurator<TActivity, TLog>> configureCompensate = null)
             where TActivity : class, IActivity<TArguments, TLog>
             where TLog : class
             where TArguments : class;
@@ -129,7 +131,7 @@ namespace MassTransit
         /// <param name="endpointDefinition">The endpoint definition to add</param>
         void AddEndpoint(Type endpointDefinition);
 
-        void AddEndpoint<TDefinition, T>(IEndpointSettings<IEndpointDefinition<T>> settings = null)
+        void AddEndpoint<TDefinition, T>(IRegistration registration, IEndpointSettings<IEndpointDefinition<T>> settings = null)
             where TDefinition : class, IEndpointDefinition<T>
             where T : class;
 
@@ -172,6 +174,22 @@ namespace MassTransit
         void AddRequestClient(Type requestType, Uri destinationAddress, RequestTimeout timeout = default);
 
         /// <summary>
+        /// Sets the default request timeout for this bus instance, used by the client factory to create request clients
+        /// </summary>
+        /// <param name="timeout"></param>
+        void SetDefaultRequestTimeout(RequestTimeout timeout);
+
+        /// <summary>
+        /// Sets the default request timeout for this bus instance, used by the client factory to create request clients
+        /// </summary>
+        /// <param name="d">days</param>
+        /// <param name="h">hours</param>
+        /// <param name="m">minutes</param>
+        /// <param name="s">seconds</param>
+        /// <param name="ms">milliseconds</param>
+        void SetDefaultRequestTimeout(int? d = null, int? h = null, int? m = null, int? s = null, int? ms = null);
+
+        /// <summary>
         /// Set the default endpoint name formatter used for endpoint names
         /// </summary>
         /// <param name="endpointNameFormatter"></param>
@@ -200,19 +218,5 @@ namespace MassTransit
         /// <typeparam name="TFuture"></typeparam>
         IFutureRegistrationConfigurator<TFuture> AddFuture<TFuture>(Type futureDefinitionType = null)
             where TFuture : class, SagaStateMachine<FutureState>;
-
-        /// <summary>
-        /// Adds a method that is called for each receive endpoint when it is configured, allowing additional
-        /// configuration to be specified.
-        /// </summary>
-        /// <param name="callback">Callback invoked for each receive endpoint</param>
-        void AddConfigureEndpointsCallback(ConfigureEndpointsCallback callback);
-
-        /// <summary>
-        /// Adds a method that is called for each receive endpoint when it is configured, allowing additional
-        /// configuration to be specified.
-        /// </summary>
-        /// <param name="callback">Callback invoked for each receive endpoint</param>
-        void AddConfigureEndpointsCallback(ConfigureEndpointsProviderCallback callback);
     }
 }

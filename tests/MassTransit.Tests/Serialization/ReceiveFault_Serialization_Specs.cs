@@ -5,7 +5,6 @@
     using MassTransit.Serialization;
     using Metadata;
     using NUnit.Framework;
-    using Shouldly;
 
 
     [TestFixture(typeof(NewtonsoftXmlMessageSerializer))]
@@ -14,6 +13,7 @@
     [TestFixture(typeof(BsonMessageSerializer))]
     [TestFixture(typeof(EncryptedMessageSerializer))]
     [TestFixture(typeof(EncryptedMessageSerializerV2))]
+    [TestFixture(typeof(MessagePackMessageSerializer))]
     public class ReceiveFault_Serialization_Specs :
         SerializationTest
     {
@@ -69,7 +69,7 @@
         void TestCanSerialize(ReceiveFaultEvent fault)
         {
             byte[] bytes = Serialize(fault);
-            bytes.Length.ShouldBeGreaterThan(0);
+            Assert.That(bytes, Is.Not.Empty);
         }
     }
 }

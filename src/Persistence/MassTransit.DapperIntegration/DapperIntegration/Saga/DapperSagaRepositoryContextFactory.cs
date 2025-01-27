@@ -9,7 +9,9 @@ namespace MassTransit.DapperIntegration.Saga
 
 
     public class DapperSagaRepositoryContextFactory<TSaga> :
-        ISagaRepositoryContextFactory<TSaga>
+        ISagaRepositoryContextFactory<TSaga>,
+        IQuerySagaRepositoryContextFactory<TSaga>,
+        ILoadSagaRepositoryContextFactory<TSaga>
         where TSaga : class, ISaga
     {
         readonly ISagaConsumeContextFactory<DatabaseContext<TSaga>, TSaga> _factory;
@@ -21,6 +23,18 @@ namespace MassTransit.DapperIntegration.Saga
             _factory = factory;
         }
 
+        public Task<T> Execute<T>(Func<LoadSagaRepositoryContext<TSaga>, Task<T>> asyncMethod, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            return ExecuteAsyncMethod(asyncMethod, cancellationToken);
+        }
+
+        public Task<T> Execute<T>(Func<QuerySagaRepositoryContext<TSaga>, Task<T>> asyncMethod, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            return ExecuteAsyncMethod(asyncMethod, cancellationToken);
+        }
+
         public void Probe(ProbeContext context)
         {
             context.Add("persistence", "dapper");
@@ -29,7 +43,7 @@ namespace MassTransit.DapperIntegration.Saga
         public async Task Send<T>(ConsumeContext<T> context, IPipe<SagaRepositoryContext<TSaga, T>> next)
             where T : class
         {
-            using DapperDatabaseContext<TSaga> databaseContext = await CreateDatabaseContext(context.CancellationToken).ConfigureAwait(false);
+            await using DatabaseContext<TSaga> databaseContext = await CreateDatabaseContext(context.CancellationToken).ConfigureAwait(false);
 
             var repositoryContext = new DapperSagaRepositoryContext<TSaga, T>(databaseContext, context, _factory);
 
@@ -41,7 +55,7 @@ namespace MassTransit.DapperIntegration.Saga
         public async Task SendQuery<T>(ConsumeContext<T> context, ISagaQuery<TSaga> query, IPipe<SagaRepositoryQueryContext<TSaga, T>> next)
             where T : class
         {
-            using DapperDatabaseContext<TSaga> databaseContext = await CreateDatabaseContext(context.CancellationToken).ConfigureAwait(false);
+            await using DatabaseContext<TSaga> databaseContext = await CreateDatabaseContext(context.CancellationToken).ConfigureAwait(false);
 
             IEnumerable<TSaga> instances = await databaseContext.QueryAsync(query.FilterExpression, context.CancellationToken).ConfigureAwait(false);
 
@@ -54,11 +68,10 @@ namespace MassTransit.DapperIntegration.Saga
             databaseContext.Commit();
         }
 
-        public async Task<T> Execute<T>(Func<SagaRepositoryContext<TSaga>, Task<T>> asyncMethod, CancellationToken cancellationToken = default)
+        async Task<T> ExecuteAsyncMethod<T>(Func<DapperSagaRepositoryContext<TSaga>, Task<T>> asyncMethod, CancellationToken cancellationToken)
             where T : class
         {
-            using DapperDatabaseContext<TSaga> databaseContext = await CreateDatabaseContext(cancellationToken).ConfigureAwait(false);
-
+            await using DatabaseContext<TSaga> databaseContext = await CreateDatabaseContext(cancellationToken).ConfigureAwait(false);
             var sagaRepositoryContext = new DapperSagaRepositoryContext<TSaga>(databaseContext, cancellationToken);
 
             var result = await asyncMethod(sagaRepositoryContext).ConfigureAwait(false);
@@ -68,7 +81,7 @@ namespace MassTransit.DapperIntegration.Saga
             return result;
         }
 
-        async Task<DapperDatabaseContext<TSaga>> CreateDatabaseContext(CancellationToken cancellationToken)
+        async Task<DatabaseContext<TSaga>> CreateDatabaseContext(CancellationToken cancellationToken)
         {
             var connection = new SqlConnection(_options.ConnectionString);
             SqlTransaction transaction = null;
@@ -78,7 +91,9 @@ namespace MassTransit.DapperIntegration.Saga
 
                 transaction = connection.BeginTransaction(_options.IsolationLevel);
 
-                return new DapperDatabaseContext<TSaga>(connection, transaction);
+                return _options.ContextFactory != null
+                    ? _options.ContextFactory(connection, transaction)
+                    : new DapperDatabaseContext<TSaga>(connection, transaction);
             }
             catch (Exception)
             {

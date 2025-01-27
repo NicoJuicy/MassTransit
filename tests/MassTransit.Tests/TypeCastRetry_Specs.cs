@@ -9,7 +9,9 @@ namespace MassTransit.Tests
     public class TypeCastRetry_Specs :
         InMemoryTestFixture
     {
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<CreateCommand>> _received;
+        #pragma warning restore NUnit1032
 
         [Test]
         public async Task Should_receive_the_message()
@@ -22,7 +24,7 @@ namespace MassTransit.Tests
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
             var sec5 = TimeSpan.FromSeconds(5);
-            configurator.UseRetry(x => x.Exponential(2, sec5, sec5, sec5));
+            configurator.UseMessageRetry(x => x.Exponential(2, sec5, sec5, sec5));
 
             base.ConfigureInMemoryBus(configurator);
         }

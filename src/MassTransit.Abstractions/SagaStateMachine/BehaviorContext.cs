@@ -10,13 +10,13 @@
     /// <typeparam name="TSaga">The state instance type</typeparam>
     public interface BehaviorContext<TSaga> :
         SagaConsumeContext<TSaga>
-        where TSaga : class, ISaga
+        where TSaga : class, SagaStateMachineInstance
     {
         StateMachine<TSaga> StateMachine { get; }
 
         Event Event { get; }
 
-        [Obsolete("Deprecated, use Saga instead")]
+        [Obsolete("Use Saga instead. Visit https://masstransit.io/obsolete for details.")]
         TSaga Instance { get; }
 
         /// <summary>
@@ -65,12 +65,12 @@
     public interface BehaviorContext<TSaga, out TMessage> :
         SagaConsumeContext<TSaga, TMessage>,
         BehaviorContext<TSaga>
-        where TSaga : class, ISaga
+        where TSaga : class, SagaStateMachineInstance
         where TMessage : class
     {
         new Event<TMessage> Event { get; }
 
-        [Obsolete("Deprecated, use Message instead")]
+        [Obsolete("Use Message instead. Visit https://masstransit.io/obsolete for details.")]
         TMessage Data { get; }
 
         new Task<SendTuple<T>> Init<T>(object values)

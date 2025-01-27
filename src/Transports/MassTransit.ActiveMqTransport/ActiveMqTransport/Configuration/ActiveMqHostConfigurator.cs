@@ -29,10 +29,17 @@ namespace MassTransit.ActiveMqTransport.Configuration
             _settings.Password = password;
         }
 
-        public void UseSsl()
+        public void UseSsl(bool enabled = true)
         {
-            _settings.UseSsl = true;
-            if (_settings.Port == 61616)
+            _settings.UseSsl = enabled;
+            if (enabled && _settings.Port == 61616)
+                _settings.Port = 61617;
+        }
+
+        public void UseSsl(bool enabled, bool updatePort)
+        {
+            _settings.UseSsl = enabled;
+            if (enabled && updatePort && _settings.Port == 61616)
                 _settings.Port = 61617;
         }
 
@@ -45,6 +52,11 @@ namespace MassTransit.ActiveMqTransport.Configuration
         {
             foreach (KeyValuePair<string, string> option in options)
                 _settings.TransportOptions[option.Key] = option.Value;
+        }
+
+        public void EnableAsyncSend()
+        {
+            _settings.TransportOptions["nms.AsyncSend"] = "true";
         }
 
         public void EnableOptimizeAcknowledge()

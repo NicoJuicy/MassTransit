@@ -5,7 +5,6 @@
     using MassTransit.Courier.Contracts;
     using MassTransit.Testing;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
     using TestFramework.Courier;
 
@@ -30,18 +29,20 @@
             await _reviseActivityCompleted;
             ConsumeContext<RoutingSlipActivityCompleted> testActivityResult = await _testActivityCompleted;
 
-            testActivityResult.GetArgument<string>("Value").ShouldBe("Added");
+            Assert.That(testActivityResult.GetArgument<string>("Value"), Is.EqualTo("Added"));
 
             ConsumeContext<RoutingSlipActivityCompleted> consumeContext = await _handled;
 
             Assert.That(consumeContext.GetArgument<string>("Value"), Is.EqualTo("Added"));
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<RoutingSlipActivityCompleted>> _handled;
         Task<ConsumeContext<RoutingSlipCompleted>> _completed;
         Task<ConsumeContext<RoutingSlipActivityCompleted>> _testActivityCompleted;
         Task<ConsumeContext<RoutingSlipActivityCompleted>> _reviseActivityCompleted;
         Guid _trackingNumber;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {

@@ -42,6 +42,7 @@
         }
 
         public string ReplyToSessionId { get; set; }
+        public string ReplyTo { get; set; }
 
         public DateTime? ScheduledEnqueueTimeUtc { get; set; }
 
@@ -110,19 +111,29 @@
             return false;
         }
 
-        public long GetSequenceNumber(Guid scheduledMessageId)
-        {
-            return BitConverter.ToInt64(scheduledMessageId.ToByteArray(), 0);
-        }
-
         public override void ReadPropertiesFrom(IReadOnlyDictionary<string, object> properties)
         {
             base.ReadPropertiesFrom(properties);
 
-            PartitionKey = ReadString(properties, PropertyNames.PartitionKey);
-            SessionId = ReadString(properties, PropertyNames.SessionId);
-            ReplyToSessionId = ReadString(properties, PropertyNames.ReplyToSessionId);
-            Label = ReadString(properties, PropertyNames.Label);
+            var partitionKey = ReadString(properties, AzureServiceBusTransportPropertyNames.PartitionKey);
+            if (!string.IsNullOrWhiteSpace(partitionKey))
+                PartitionKey = partitionKey;
+
+            var sessionId = ReadString(properties, AzureServiceBusTransportPropertyNames.SessionId);
+            if (!string.IsNullOrWhiteSpace(sessionId))
+                SessionId = sessionId;
+
+            var replyToSessionId = ReadString(properties, AzureServiceBusTransportPropertyNames.ReplyToSessionId);
+            if (!string.IsNullOrWhiteSpace(replyToSessionId))
+                ReplyToSessionId = replyToSessionId;
+
+            var replyTo = ReadString(properties, AzureServiceBusTransportPropertyNames.ReplyTo);
+            if (!string.IsNullOrWhiteSpace(replyTo))
+                ReplyTo = replyTo;
+
+            var label = ReadString(properties, AzureServiceBusTransportPropertyNames.Label);
+            if (!string.IsNullOrWhiteSpace(label))
+                Label = label;
         }
 
         public override void WritePropertiesTo(IDictionary<string, object> properties)
@@ -130,22 +141,15 @@
             base.WritePropertiesTo(properties);
 
             if (!string.IsNullOrWhiteSpace(PartitionKey))
-                properties[PropertyNames.PartitionKey] = PartitionKey;
+                properties[AzureServiceBusTransportPropertyNames.PartitionKey] = PartitionKey;
             if (!string.IsNullOrWhiteSpace(SessionId))
-                properties[PropertyNames.SessionId] = SessionId;
+                properties[AzureServiceBusTransportPropertyNames.SessionId] = SessionId;
             if (!string.IsNullOrWhiteSpace(ReplyToSessionId))
-                properties[PropertyNames.ReplyToSessionId] = ReplyToSessionId;
+                properties[AzureServiceBusTransportPropertyNames.ReplyToSessionId] = ReplyToSessionId;
+            if (!string.IsNullOrWhiteSpace(ReplyTo))
+                properties[AzureServiceBusTransportPropertyNames.ReplyTo] = ReplyTo;
             if (!string.IsNullOrWhiteSpace(Label))
-                properties[PropertyNames.Label] = Label;
-        }
-
-
-        static class PropertyNames
-        {
-            public const string PartitionKey = "ASB-PartitionKey";
-            public const string SessionId = "ASB-SessionId";
-            public const string ReplyToSessionId = "ASB-ReplyToSessionId";
-            public const string Label = "ASB-Label";
+                properties[AzureServiceBusTransportPropertyNames.Label] = Label;
         }
     }
 }

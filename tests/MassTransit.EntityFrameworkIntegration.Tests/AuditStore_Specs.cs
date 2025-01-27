@@ -4,9 +4,8 @@
     using System.Linq;
     using System.Threading.Tasks;
     using Audit;
+    using MassTransit.Tests;
     using NUnit.Framework;
-    using Shouldly;
-    using TestFramework;
     using Testing;
 
 
@@ -18,7 +17,7 @@
         {
             var consumed = _harness.Consumed;
             await Task.Delay(500);
-            (await GetAuditRecords("Consume")).ShouldBe(consumed.Count());
+            Assert.That(await GetAuditRecords("Consume"), Is.EqualTo(consumed.Count()));
         }
 
         [Test]
@@ -26,7 +25,7 @@
         {
             var sent = _harness.Sent;
             await Task.Delay(500);
-            (await GetAuditRecords("Send")).ShouldBe(sent.Count());
+            Assert.That(await GetAuditRecords("Send"), Is.EqualTo(sent.Count()));
         }
 
         [SetUp]

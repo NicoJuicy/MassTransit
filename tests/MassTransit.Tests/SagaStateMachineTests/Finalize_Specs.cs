@@ -14,6 +14,7 @@
         TestStateMachine _machine;
 
         InMemorySagaRepository<Instance> _repository;
+        ILoadSagaRepository<Instance> LoadSagaRepository => _repository;
 
         [Test]
         public async Task Should_remove_saga_when_completed_in_whenenter()
@@ -24,12 +25,12 @@
             await InputQueueSendEndpoint.Send(firstMessage);
 
             Guid? saga = await _repository.ShouldContainSagaInState(correlationId, _machine, x => x.OtherState, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
 
             _taskCompletionSource.SetResult(true);
 
-            saga = await _repository.ShouldNotContainSaga(correlationId, TestTimeout);
-            Assert.IsFalse(saga.HasValue);
+            saga = await LoadSagaRepository.ShouldNotContainSaga(correlationId, TestTimeout);
+            Assert.That(saga.HasValue, Is.False);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)

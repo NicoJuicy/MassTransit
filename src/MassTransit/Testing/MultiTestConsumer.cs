@@ -9,7 +9,7 @@
 
     public class MultiTestConsumer
     {
-        readonly IList<IConsumerConfigurator> _configures;
+        readonly List<IConsumerConfigurator> _configures;
         readonly ReceivedMessageList _received;
         readonly CancellationToken _testCompleted;
 
@@ -47,7 +47,7 @@
 
         public ConnectHandle Connect(IConsumePipeConnector bus)
         {
-            var handles = new List<ConnectHandle>();
+            var handles = new List<ConnectHandle>(_configures.Count);
             try
             {
                 foreach (var configure in _configures)

@@ -23,7 +23,8 @@ namespace MassTransit.Configuration
             ClassMap(provider => provider.GetService<BsonClassMap<TSaga>>() ?? new BsonClassMap<TSaga>(cfg =>
             {
                 cfg.AutoMap();
-                cfg.MapIdProperty(x => x.CorrelationId);
+                cfg.MapIdProperty(x => x.CorrelationId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.Version).SetIgnoreIfDefault(false);
             }));
         }
 
@@ -41,13 +42,11 @@ namespace MassTransit.Configuration
                 yield return this.Failure("ClassMapFactory", "must be specified");
         }
 
-        public void Register<T>(ISagaRepositoryRegistrationConfigurator<T> configurator)
-            where T : class, ISagaVersion
+        public void Register(ISagaRepositoryRegistrationConfigurator<TSaga> configurator)
         {
             IMongoCollection<TSaga> MongoDbCollectionFactory(IServiceProvider provider)
             {
-                if (!BsonClassMap.IsClassMapRegistered(typeof(TSaga)))
-                    BsonClassMap.RegisterClassMap(_classMapFactory(provider));
+                BsonClassMap.TryRegisterClassMap(_classMapFactory(provider));
 
                 var database = ProviderDatabaseFactory(provider);
                 var collectionNameFormatter = CollectionNameFormatterFactory(provider);
@@ -67,8 +66,10 @@ namespace MassTransit.Configuration
 
             configurator.TryAddScoped(provider => provider.GetRequiredService<MongoDbContext>().GetCollection<TSaga>());
 
-            configurator.RegisterSagaRepository<T, MongoDbCollectionContext<T>, SagaConsumeContextFactory<MongoDbCollectionContext<T>, T>,
-                MongoDbSagaRepositoryContextFactory<T>>();
+            configurator.RegisterLoadSagaRepository<TSaga, MongoDbSagaRepositoryContextFactory<TSaga>>();
+            configurator.RegisterQuerySagaRepository<TSaga, MongoDbSagaRepositoryContextFactory<TSaga>>();
+            configurator.RegisterSagaRepository<TSaga, MongoDbCollectionContext<TSaga>, SagaConsumeContextFactory<MongoDbCollectionContext<TSaga>, TSaga>,
+                MongoDbSagaRepositoryContextFactory<TSaga>>();
         }
     }
 }

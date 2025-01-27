@@ -1,5 +1,4 @@
-﻿#nullable enable
-namespace MassTransit
+﻿namespace MassTransit
 {
     using System;
     using System.Net.Mime;
@@ -68,6 +67,11 @@ namespace MassTransit
         /// The endpoint configured serialization collection
         /// </summary>
         ISerialization Serialization { get; set; }
+
+        /// <summary>
+        /// The supported message types for the message being sent/published. For internal use only.
+        /// </summary>
+        string[] SupportedMessageTypes { get; set; }
 
         /// <summary>
         /// After serialization, should return the length of the message body

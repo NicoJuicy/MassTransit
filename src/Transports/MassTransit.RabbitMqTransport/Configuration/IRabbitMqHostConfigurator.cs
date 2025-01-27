@@ -1,11 +1,8 @@
-﻿namespace MassTransit
+﻿#nullable enable
+namespace MassTransit
 {
     using System;
-    using System.Threading.Tasks;
     using RabbitMQ.Client;
-
-
-    public delegate Task RefreshConnectionFactoryCallback(ConnectionFactory connectionFactory);
 
 
     public interface IRabbitMqHostConfigurator
@@ -19,10 +16,15 @@
         RefreshConnectionFactoryCallback OnRefreshConnectionFactory { set; }
 
         /// <summary>
+        /// Sets the credential provider, overriding the default username/password credentials
+        /// </summary>
+        ICredentialsProvider CredentialsProvider { set; }
+
+        /// <summary>
         /// Configure the use of SSL to connection to RabbitMQ
         /// </summary>
-        /// <param name="configureSsl"></param>
-        void UseSsl(Action<IRabbitMqSslConfigurator> configureSsl);
+        /// <param name="configure"></param>
+        void UseSsl(Action<IRabbitMqSslConfigurator>? configure = null);
 
         /// <summary>
         /// Specifies the heartbeat interval, in seconds, used to maintain the connection to RabbitMQ.
@@ -75,12 +77,6 @@
         void RequestedConnectionTimeout(TimeSpan timeSpan);
 
         /// <summary>
-        /// Configure the RabbitMQ Batch Publish transport settings
-        /// </summary>
-        /// <param name="configure"></param>
-        void ConfigureBatchPublish(Action<IRabbitMqBatchPublishConfigurator> configure);
-
-        /// <summary>
         /// Sets the continuation timeout for command communication with RabbitMQ
         /// </summary>
         /// <param name="timeout"></param>
@@ -90,5 +86,10 @@
         /// Configure the Max message size for RabbitMQ.Client
         /// </summary>
         void MaxMessageSize(uint maxMessageSize);
+
+        /// <summary>
+        /// Sets the connection name for the connection to RabbitMQ
+        /// </summary>
+        void ConnectionName(string? connectionName);
     }
 }

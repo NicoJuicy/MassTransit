@@ -34,7 +34,8 @@ namespace MassTransit.TestFramework
             _cancellation = new List<Action<CancellationToken>>();
         }
 
-        protected IServiceProvider ServiceProvider { get; private set; }
+        ServiceProvider _serviceProvider;
+        protected IServiceProvider ServiceProvider => _serviceProvider;
 
         protected IBusRegistrationContext BusRegistrationContext => ServiceProvider.GetRequiredService<IBusRegistrationContext>();
 
@@ -68,6 +69,7 @@ namespace MassTransit.TestFramework
         [OneTimeSetUp]
         public async Task ContainerFixtureOneTimeSetup()
         {
+        #pragma warning disable CS0618
             var collection = new ServiceCollection()
                 .AddSingleton<ILoggerFactory>(provider => new TestOutputLoggerFactory(true))
                 .AddSingleton(typeof(ILogger<>), typeof(Logger<>))
@@ -77,10 +79,11 @@ namespace MassTransit.TestFramework
 
                     ConfigureMassTransit(cfg);
                 });
+        #pragma warning restore CS0618
 
             collection = ConfigureServices(collection);
 
-            ServiceProvider = collection.BuildServiceProvider();
+            _serviceProvider = collection.BuildServiceProvider();
 
             ConfigureLogging(ServiceProvider);
 
@@ -115,15 +118,9 @@ namespace MassTransit.TestFramework
 
             await InMemoryTestHarness.Stop().ConfigureAwait(false);
 
-            switch (ServiceProvider)
-            {
-                case IAsyncDisposable asyncDisposable:
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-                    break;
-                case IDisposable disposable:
-                    disposable.Dispose();
-                    break;
-            }
+            InMemoryTestHarness.Dispose();
+
+            await _serviceProvider.DisposeAsync();
         }
 
         protected virtual void ConfigureMassTransit(IBusRegistrationConfigurator configurator)
@@ -162,10 +159,16 @@ namespace MassTransit.TestFramework
             return ServiceProvider.GetRequiredService<IClientFactory>();
         }
 
-        protected ISagaRepository<T> GetSagaRepository<T>()
+        protected ILoadSagaRepository<T> GetLoadSagaRepository<T>()
             where T : class, ISaga
         {
-            return ServiceProvider.GetRequiredService<ISagaRepository<T>>();
+            return ServiceProvider.GetRequiredService<ILoadSagaRepository<T>>();
+        }
+
+        protected IQuerySagaRepository<T> GetQuerySagaRepository<T>()
+            where T : class, ISaga
+        {
+            return ServiceProvider.GetRequiredService<IQuerySagaRepository<T>>();
         }
 
         protected async Task<Task<ConsumeContext<T>>> ConnectPublishHandler<T>()

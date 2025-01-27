@@ -4,6 +4,7 @@
     {
         using System;
         using System.Threading.Tasks;
+        using Contracts;
         using NUnit.Framework;
         using Testing;
 
@@ -31,10 +32,10 @@
 
                 Guid? saga = await _repository.ShouldContainSagaInState(x => x.MemberNumber == memberNumber, _machine, x => x.Registered, TestTimeout);
 
-                Assert.IsTrue(saga.HasValue);
+                Assert.That(saga.HasValue, Is.True);
 
                 var sagaInstance = _repository[saga.Value].Instance;
-                Assert.IsFalse(sagaInstance.ValidateAddressRequestId.HasValue);
+                Assert.That(sagaInstance.ValidateAddressRequestId.HasValue, Is.False);
             }
 
             static Sending_a_request_from_a_state_machine()
@@ -90,12 +91,12 @@
 
             protected virtual void ConfigureServiceQueueEndpoint(IReceiveEndpointConfigurator configurator)
             {
-                configurator.Handler<ValidateAddress>(async context =>
+                configurator.Handler<ValidateAddress>(context =>
                 {
                     Console.WriteLine("Address validated: {0}", context.Message.CorrelationId);
 
                     if (context.IsResponseAccepted<AddressValidated>(false))
-                        await context.RespondAsync<AddressValidated>(new { });
+                        return context.RespondAsync<AddressValidated>(new { });
 
                     throw new InvalidOperationException("Response type not accepted");
                 });
@@ -111,7 +112,7 @@
 
 
         class RequestSettingsImpl :
-            RequestSettings
+            RequestSettings<TestState, ValidateAddress, AddressValidated, AddressInvalidated>
         {
             public RequestSettingsImpl(Uri serviceAddress, Uri schedulingServiceAddress, TimeSpan timeout)
             {
@@ -125,7 +126,12 @@
             public Uri ServiceAddress { get; }
 
             public TimeSpan Timeout { get; }
-            public TimeSpan? TimeToLive { get; }
+            public bool ClearRequestIdOnFaulted => false;
+            public TimeSpan? TimeToLive => null;
+            public Action<IEventCorrelationConfigurator<TestState, AddressValidated>> Completed { get; set; }
+            public Action<IEventCorrelationConfigurator<TestState, AddressInvalidated>> Completed2 { get; set; }
+            public Action<IEventCorrelationConfigurator<TestState, Fault<ValidateAddress>>> Faulted { get; set; }
+            public Action<IEventCorrelationConfigurator<TestState, RequestTimeoutExpired<ValidateAddress>>> TimeoutExpired { get; set; }
         }
 
 
@@ -176,6 +182,15 @@
         }
 
 
+        public interface AddressInvalidated :
+            CorrelatedBy<Guid>
+        {
+            string Address { get; }
+
+            string RequestAddress { get; }
+        }
+
+
         public interface ValidateName :
             CorrelatedBy<Guid>
         {
@@ -195,7 +210,7 @@
         class TestStateMachine :
             MassTransitStateMachine<TestState>
         {
-            public TestStateMachine(RequestSettings settings)
+            public TestStateMachine(RequestSettings<TestState, ValidateAddress, AddressValidated, AddressInvalidated> settings)
             {
                 Event(() => Register, x =>
                 {
@@ -257,7 +272,8 @@
                         .ThenAsync(async context => await Console.Out.WriteLineAsync("Request timed out"))
                         .TransitionTo(NameValidationTimeout));
             } // ReSharper disable UnassignedGetOnlyAutoProperty
-            public Request<TestState, ValidateAddress, AddressValidated> ValidateAddress { get; }
+
+            public Request<TestState, ValidateAddress, AddressValidated, AddressInvalidated> ValidateAddress { get; }
             public Request<TestState, ValidateName, NameValidated> ValidateName { get; }
 
             public Event<RegisterMember> Register { get; }

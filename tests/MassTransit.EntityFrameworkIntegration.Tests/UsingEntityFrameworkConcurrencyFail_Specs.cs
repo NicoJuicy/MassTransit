@@ -4,6 +4,7 @@
     using System.Collections.Generic;
     using System.Data.Entity;
     using System.Threading.Tasks;
+    using MassTransit.Tests;
     using NUnit.Framework;
     using Saga;
     using TestFramework;
@@ -34,7 +35,7 @@
             for (var i = 0; i < 20; i++)
             {
                 Guid? sagaId = await _repository.Value.ShouldContainSaga(sagaIds[i], TestTimeout);
-                Assert.IsTrue(sagaId.HasValue);
+                Assert.That(sagaId.HasValue, Is.True);
             }
 
             for (var i = 0; i < 20; i++)
@@ -68,7 +69,7 @@
             {
                 Guid? sagaId = await _repository.Value.ShouldContainSagaInState(sid, _machine, _machine.Warmup, TestTimeout);
 
-                Assert.IsTrue(sagaId.HasValue);
+                Assert.That(sagaId.HasValue, Is.True);
             }
         }
 
@@ -81,7 +82,7 @@
 
             Guid? sagaId = await _repository.Value.ShouldContainSaga(correlationId, TestTimeout);
 
-            Assert.IsTrue(sagaId.HasValue);
+            Assert.That(sagaId.HasValue, Is.True);
 
             await Task.WhenAll(
                 InputQueueSendEndpoint.Send(new Bass
@@ -108,7 +109,7 @@
 
             sagaId = await _repository.Value.ShouldContainSagaInState(correlationId, _machine, _machine.Warmup, TestTimeout);
 
-            Assert.IsTrue(sagaId.HasValue);
+            Assert.That(sagaId.HasValue, Is.True);
         }
 
         ChoirStateMachine _machine;

@@ -141,6 +141,11 @@ namespace MassTransit
         public const string TransportMessageId = "TransportMessageId";
 
         /// <summary>
+        /// The Transport sent time (not supported by all, but hopefully enough)
+        /// </summary>
+        public const string TransportSentTime = "TransportSentTime";
+
+        /// <summary>
         /// When the message is redelivered or scheduled, and a new MessageId was generated, the original messageId
         /// </summary>
         public const string OriginalMessageId = "MT-OriginalMessageId";
@@ -173,6 +178,11 @@ namespace MassTransit
         public static class Request
         {
             public const string Accept = "MT-Request-AcceptType";
+
+            /// <summary>
+            /// Tracks routing slip retries when using the RoutingSlipRequestProxy
+            /// </summary>
+            public const string RoutingSlipRetryCount = "MT-RoutingSlip-RetryCount";
         }
 
 

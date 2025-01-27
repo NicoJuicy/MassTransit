@@ -3,6 +3,7 @@ namespace MassTransit.Configuration
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using Transports;
 
 
     public class ReceiverConfiguration :
@@ -10,7 +11,7 @@ namespace MassTransit.Configuration
         IReceiveEndpointConfigurator
     {
         readonly IReceiveEndpointConfiguration _configuration;
-        protected readonly IList<IReceiveEndpointSpecification> Specifications;
+        protected readonly List<IReceiveEndpointSpecification> Specifications;
 
         protected ReceiverConfiguration(IReceiveEndpointConfiguration endpointConfiguration)
             : base(endpointConfiguration)
@@ -35,7 +36,7 @@ namespace MassTransit.Configuration
             set { }
         }
 
-        public void AddDependency(IReceiveEndpointDependentConnector dependent)
+        public void AddDependency(IReceiveEndpointDependency dependent)
         {
         }
 
@@ -44,12 +45,16 @@ namespace MassTransit.Configuration
             return _configuration.ConnectReceiveEndpointObserver(observer);
         }
 
-        public void AddDependent(IReceiveEndpointObserverConnector dependency)
+        public void AddDependent(IReceiveEndpointDependent dependent)
         {
         }
 
         public void ConfigureMessageTopology<T>(bool enabled = true)
             where T : class
+        {
+        }
+
+        public void ConfigureMessageTopology(Type messageType, bool enabled = true)
         {
         }
 

@@ -44,10 +44,12 @@
             });
         }
 
-        protected override void OnCleanupVirtualHost(IModel model)
+        protected override async Task OnCleanupVirtualHost(IChannel channel)
         {
-            model.ExchangeDelete("input-fault");
-            model.QueueDelete("input-fault");
+            await base.OnCleanupVirtualHost(channel);
+
+            await channel.ExchangeDeleteAsync("input-fault");
+            await channel.QueueDeleteAsync("input-fault");
         }
 
 
@@ -124,10 +126,12 @@
             });
         }
 
-        protected override void OnCleanupVirtualHost(IModel model)
+        protected override async Task OnCleanupVirtualHost(IChannel channel)
         {
-            model.ExchangeDelete("input-fault");
-            model.QueueDelete("input-fault");
+            await base.OnCleanupVirtualHost(channel);
+
+            await channel.ExchangeDeleteAsync("input-fault");
+            await channel.QueueDeleteAsync("input-fault");
         }
 
 
@@ -194,16 +198,18 @@
         protected override void ConfigureRabbitMqReceiveEndpoint(IRabbitMqReceiveEndpointConfigurator configurator)
         {
             configurator.UseDelayedRedelivery(r => r.Interval(1, TimeSpan.FromMilliseconds(100)));
-            configurator.UseRetry(r => r.Interval(1, TimeSpan.FromMilliseconds(100)));
+            configurator.UseMessageRetry(r => r.Interval(1, TimeSpan.FromMilliseconds(100)));
             configurator.UseInMemoryOutbox();
 
             configurator.Consumer<TestHandler>();
         }
 
-        protected override void OnCleanupVirtualHost(IModel model)
+        protected override async Task OnCleanupVirtualHost(IChannel channel)
         {
-            model.ExchangeDelete("input-fault");
-            model.QueueDelete("input-fault");
+            await base.OnCleanupVirtualHost(channel);
+
+            await channel.ExchangeDeleteAsync("input-fault");
+            await channel.QueueDeleteAsync("input-fault");
         }
 
 

@@ -2,13 +2,11 @@ namespace MassTransit.Tests.Serialization
 {
     using System;
     using System.Linq;
-    using System.Reflection;
     using System.Threading.Tasks;
     using MassTransit.Configuration;
     using MassTransit.Serialization;
     using MassTransit.Testing;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
 
 
@@ -18,6 +16,7 @@ namespace MassTransit.Tests.Serialization
     [TestFixture(typeof(NewtonsoftXmlMessageSerializer))]
     [TestFixture(typeof(EncryptedMessageSerializer))]
     [TestFixture(typeof(EncryptedMessageSerializerV2))]
+    [TestFixture(typeof(MessagePackMessageSerializer))]
     public class Deserializing_an_interface :
         SerializationTest
     {
@@ -32,7 +31,9 @@ namespace MassTransit.Tests.Serialization
 
             var result = SerializeAndReturn(complaint);
 
-            complaint.Equals(result).ShouldBe(true);
+            #pragma warning disable NUnit2010
+            Assert.That(complaint.Equals(result), Is.True);
+            #pragma warning restore NUnit2010
         }
 
         [Test]
@@ -54,7 +55,7 @@ namespace MassTransit.Tests.Serialization
 
             await pipe.Send(new TestConsumeContext<ComplaintAdded>(complaint));
 
-            consumer.Received.Select<ComplaintAdded>().Any().ShouldBe(true);
+            Assert.That(consumer.Received.Select<ComplaintAdded>().Any(), Is.True);
         }
 
         public Deserializing_an_interface(Type serializerType)
@@ -184,7 +185,7 @@ namespace MassTransit.Tests.Serialization
                 return false;
             if (ReferenceEquals(this, obj))
                 return true;
-            if (!typeof(ComplaintAdded).GetTypeInfo().IsAssignableFrom(obj.GetType()))
+            if (!typeof(ComplaintAdded).IsAssignableFrom(obj.GetType()))
                 return false;
             return Equals((ComplaintAdded)obj);
         }

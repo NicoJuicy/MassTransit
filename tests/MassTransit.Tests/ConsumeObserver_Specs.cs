@@ -7,7 +7,6 @@ namespace MassTransit.Tests
         using MassTransit.Testing;
         using MassTransit.Testing.Implementations;
         using NUnit.Framework;
-        using Shouldly;
         using TestFramework;
         using TestFramework.Messages;
 
@@ -28,7 +27,7 @@ namespace MassTransit.Tests
             {
                 IReceivedMessage<PingMessage> context = _observer.Messages.Select<PingMessage>().First();
 
-                context.ShouldNotBeNull();
+                Assert.That(context, Is.Not.Null);
             }
 
             TestConsumeMessageObserver<PingMessage> _pingObserver;
@@ -90,7 +89,7 @@ namespace MassTransit.Tests
 
                 IReceivedMessage<PingMessage> context = observer.Messages.Select<PingMessage>().First();
 
-                context.ShouldNotBeNull();
+                Assert.That(context, Is.Not.Null);
             }
 
             [Test]
@@ -127,8 +126,11 @@ namespace MassTransit.Tests
 
                 await pingObserver.PostConsumed;
 
-                Assert.That(observer.Messages.Select<PingMessage>().First(), Is.Not.Null);
-                Assert.That(observer.Messages.Select<PongMessage>().First(), Is.Not.Null);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(observer.Messages.Select<PingMessage>().First(), Is.Not.Null);
+                    Assert.That(observer.Messages.Select<PongMessage>().First(), Is.Not.Null);
+                });
             }
         }
     }

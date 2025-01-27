@@ -10,7 +10,7 @@ namespace MassTransit
         RequestException
     {
         public RequestFaultException(string requestType, Fault fault)
-            : base($"The {requestType} request faulted: {string.Join(Environment.NewLine, fault.Exceptions.Select(x => x.Message))}")
+            : base($"The {requestType} request faulted: {string.Join(Environment.NewLine, fault.Exceptions?.Select(x => x.Message) ?? [])}")
         {
             RequestType = requestType;
             Fault = fault;
@@ -20,6 +20,9 @@ namespace MassTransit
         {
         }
 
+#if NET8_0_OR_GREATER
+        [Obsolete("Formatter-based serialization is obsolete and should not be used.")]
+#endif
         protected RequestFaultException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -30,6 +33,9 @@ namespace MassTransit
         public string? RequestType { get; private set; }
         public Fault? Fault { get; private set; }
 
+#if NET8_0_OR_GREATER
+        [Obsolete("Formatter-based serialization is obsolete and should not be used.")]
+#endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

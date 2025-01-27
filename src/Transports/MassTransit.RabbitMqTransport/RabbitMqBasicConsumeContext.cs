@@ -1,12 +1,11 @@
 ﻿namespace MassTransit
 {
-    using System;
     using RabbitMQ.Client;
 
 
     /// <summary>
     /// Contains the context of the BasicConsume call received by the BasicConsumer
-    /// bound to the inbound RabbitMQ model
+    /// bound to the inbound RabbitMQ channel
     /// </summary>
     public interface RabbitMqBasicConsumeContext :
         RoutingKeyConsumeContext
@@ -29,12 +28,6 @@
         /// <summary>
         /// The basic properties of the message
         /// </summary>
-        IBasicProperties Properties { get; }
-
-        /// <summary>
-        /// The message body, since it's a byte array on RabbitMQ
-        /// </summary>
-        [Obsolete("This is a fail, we need to use the Body of receive context")]
-        byte[] Body { get; }
+        IReadOnlyBasicProperties Properties { get; }
     }
 }

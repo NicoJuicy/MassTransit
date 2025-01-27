@@ -10,7 +10,6 @@ export default defineAppConfig({
         image: 'https://raw.githubusercontent.com/phatboyg/MassTransit/docus/docus/public/landing-image.png',
         url: 'https://masstransit-project.com',
         socials: {
-            twitter: 'mtproj',
             github: 'MassTransit/MassTransit'
         },
         aside: {
@@ -23,7 +22,7 @@ export default defineAppConfig({
         },
         footer: {
             credits: {
-                text: 'Copyright 2023 Chris Patterson',
+                text: 'Copyright 2024 Chris Patterson',
                 href: 'https://masstransit.io',
                 icon: 'IconMassTransit'
             },

@@ -4,25 +4,24 @@ namespace MassTransit.Configuration
     using DependencyInjection.Registration;
     using Internals;
     using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.DependencyInjection.Extensions;
 
 
     public static class DependencyInjectionEndpointRegistrationExtensions
     {
-        public static IEndpointRegistration RegisterEndpoint<TDefinition, T>(this IServiceCollection collection,
+        public static IEndpointRegistration RegisterEndpoint<TDefinition, T>(this IServiceCollection collection, IRegistration registration,
             IEndpointSettings<IEndpointDefinition<T>> settings = null)
             where TDefinition : class, IEndpointDefinition<T>
             where T : class
         {
-            return RegisterEndpoint<TDefinition, T>(collection, new DependencyInjectionContainerRegistrar(collection), settings);
+            return RegisterEndpoint<TDefinition, T>(collection, new DependencyInjectionContainerRegistrar(collection), registration, settings);
         }
 
         public static IEndpointRegistration RegisterEndpoint<TDefinition, T>(this IServiceCollection collection, IContainerRegistrar registrar,
-            IEndpointSettings<IEndpointDefinition<T>> settings = null)
+            IRegistration registration, IEndpointSettings<IEndpointDefinition<T>> settings = null)
             where T : class
             where TDefinition : class, IEndpointDefinition<T>
         {
-            return new EndpointRegistrar<TDefinition, T>().Register(collection, registrar, settings);
+            return new EndpointRegistrar<TDefinition, T>(registration).Register(registrar, settings);
         }
 
         public static IEndpointRegistration RegisterEndpoint(this IServiceCollection collection, Type endpointDefinitionType)
@@ -37,13 +36,13 @@ namespace MassTransit.Configuration
 
             var register = (IEndpointRegistrar)Activator.CreateInstance(typeof(EndpointRegistrar<,>).MakeGenericType(endpointDefinitionType, types[0]));
 
-            return register.Register(collection, registrar);
+            return register.Register(registrar);
         }
 
 
         interface IEndpointRegistrar
         {
-            IEndpointRegistration Register(IServiceCollection collection, IContainerRegistrar registrar);
+            IEndpointRegistration Register(IContainerRegistrar registrar);
         }
 
 
@@ -52,21 +51,25 @@ namespace MassTransit.Configuration
             where TDefinition : class, IEndpointDefinition<T>
             where T : class
         {
-            public IEndpointRegistration Register(IServiceCollection collection, IContainerRegistrar registrar)
-            {
-                collection.TryAddTransient<IEndpointDefinition<T>, TDefinition>();
+            readonly IRegistration _registration;
 
-                return registrar.GetOrAdd<IEndpointRegistration>(typeof(T), _ => new EndpointRegistration<T>());
+            public EndpointRegistrar(IRegistration registration)
+            {
+                _registration = registration;
             }
 
-            public IEndpointRegistration Register(IServiceCollection collection, IContainerRegistrar registrar,
-                IEndpointSettings<IEndpointDefinition<T>> settings)
+            public IEndpointRegistration Register(IContainerRegistrar registrar)
             {
-                collection.TryAddTransient<IEndpointDefinition<T>, TDefinition>();
-                if (settings != null)
-                    collection.AddSingleton(settings);
+                registrar.AddEndpointDefinition<T, TDefinition>();
 
-                return registrar.GetOrAdd<IEndpointRegistration>(typeof(T), _ => new EndpointRegistration<T>());
+                return registrar.GetOrAddRegistration<IEndpointRegistration>(typeof(T), _ => new EndpointRegistration<T>(_registration, registrar));
+            }
+
+            public IEndpointRegistration Register(IContainerRegistrar registrar, IEndpointSettings<IEndpointDefinition<T>> settings)
+            {
+                registrar.AddEndpointDefinition<T, TDefinition>(settings);
+
+                return registrar.GetOrAddRegistration<IEndpointRegistration>(typeof(T), _ => new EndpointRegistration<T>(_registration, registrar));
             }
         }
     }

@@ -3,6 +3,7 @@ namespace MassTransit.InMemoryTransport
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using MassTransit.Configuration;
     using Topology;
     using Transports.Fabric;
@@ -13,7 +14,7 @@ namespace MassTransit.InMemoryTransport
         IInMemoryMessagePublishTopologyConfigurator<TMessage>
         where TMessage : class
     {
-        readonly IList<IInMemoryMessagePublishTopology> _implementedMessageTypes;
+        readonly List<IInMemoryMessagePublishTopology> _implementedMessageTypes;
         readonly IMessageTopology<TMessage> _messageTopology;
 
         public InMemoryMessagePublishTopology(IPublishTopologyConfigurator publishTopology, IMessageTopology<TMessage> messageTopology)
@@ -46,7 +47,7 @@ namespace MassTransit.InMemoryTransport
                 configurator.Apply(builder);
         }
 
-        public override bool TryGetPublishAddress(Uri baseAddress, out Uri? publishAddress)
+        public override bool TryGetPublishAddress(Uri baseAddress, [NotNullWhen(true)] out Uri? publishAddress)
         {
             publishAddress = new InMemoryEndpointAddress(new InMemoryHostAddress(baseAddress), _messageTopology.EntityName, exchangeType: ExchangeType);
             return true;

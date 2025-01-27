@@ -18,6 +18,7 @@ namespace MassTransit.Logging
         }
 
         public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
         {
             return TestDisposable.Instance;
         }

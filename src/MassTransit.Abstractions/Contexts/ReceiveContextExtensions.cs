@@ -1,4 +1,3 @@
-#nullable enable
 namespace MassTransit
 {
     using System;
@@ -98,12 +97,22 @@ namespace MassTransit
             return context.TransportHeaders.GetEndpointAddress(MessageHeaders.FaultAddress);
         }
 
+        /// <summary>
+        /// Returns the message sent timestamp from the transport (not message headers)
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public static DateTime? GetSentTime(this ReceiveContext context)
+        {
+            return context.TransportHeaders.GetTimestamp(MessageHeaders.TransportSentTime);
+        }
+
         public static string[] GetMessageTypes(this ReceiveContext context)
         {
             if (context.TransportHeaders.TryGetHeader(MessageHeaders.MessageType, out var value) && value is string text && !string.IsNullOrWhiteSpace(text))
                 return text.Split(';');
 
-            return Array.Empty<string>();
+            return [];
         }
 
         /// <summary>
@@ -218,7 +227,7 @@ namespace MassTransit
                     return text.Split(';');
             }
 
-            return Array.Empty<string>();
+            return [];
         }
 
         /// <summary>
@@ -247,7 +256,22 @@ namespace MassTransit
                 {
                     Guid guid => guid,
                     string text when Guid.TryParse(text, out var guid) => guid,
-                    _ => default
+                    _ => default(Guid?)
+                };
+            }
+
+            return default;
+        }
+
+        static DateTime? GetTimestamp(this Headers headers, string key)
+        {
+            if (headers.TryGetHeader(key, out var value))
+            {
+                return value switch
+                {
+                    DateTime dateTime => dateTime,
+                    string text when DateTime.TryParse(text, out var dateTime) => dateTime,
+                    _ => default(DateTime?)
                 };
             }
 

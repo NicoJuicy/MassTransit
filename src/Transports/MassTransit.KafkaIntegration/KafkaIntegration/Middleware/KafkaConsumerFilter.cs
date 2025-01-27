@@ -22,10 +22,15 @@ namespace MassTransit.KafkaIntegration.Middleware
         {
             var receiveSettings = _context.GetPayload<ReceiveSettings>();
             var consumers = new IKafkaMessageConsumer<TKey, TValue>[receiveSettings.ConcurrentConsumerLimit];
-            for (var i = 0; i < consumers.Length; i++)
-                consumers[i] = new KafkaMessageConsumer<TKey, TValue>(receiveSettings, _context, context);
+
+            for (var consumerIndex = 0; consumerIndex < consumers.Length; consumerIndex++)
+                consumers[consumerIndex] = new KafkaMessageConsumer<TKey, TValue>(receiveSettings, _context, context, consumerIndex + 1);
 
             var supervisor = CreateConsumerSupervisor(consumers);
+
+            await supervisor.Ready.ConfigureAwait(false);
+
+            _context.AddConsumeAgent(supervisor);
 
             await _context.TransportObservers.NotifyReady(_context.InputAddress).ConfigureAwait(false);
 
@@ -53,8 +58,6 @@ namespace MassTransit.KafkaIntegration.Middleware
         {
             var supervisor = new ConsumerSupervisor(actualConsumers);
 
-            _context.AddConsumeAgent(supervisor);
-
             supervisor.SetReady();
 
             return supervisor;
@@ -68,6 +71,9 @@ namespace MassTransit.KafkaIntegration.Middleware
             {
                 foreach (IKafkaMessageConsumer<TKey, TValue> consumer in consumers)
                 {
+                    if (IsStopping)
+                        return;
+
                     consumer.Completed.ContinueWith(async _ =>
                     {
                         try

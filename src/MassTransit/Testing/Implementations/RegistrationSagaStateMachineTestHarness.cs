@@ -11,15 +11,15 @@ namespace MassTransit.Testing.Implementations
     public class RegistrationSagaStateMachineTestHarness<TStateMachine, TInstance> :
         BaseSagaTestHarness<TInstance>,
         ISagaStateMachineTestHarness<TStateMachine, TInstance>,
-    #pragma warning disable CS0618
+        #pragma warning disable CS0618
         IStateMachineSagaTestHarness<TInstance, TStateMachine>
-#pragma warning restore CS0618
+    #pragma warning restore CS0618
         where TInstance : class, SagaStateMachineInstance
         where TStateMachine : SagaStateMachine<TInstance>
     {
-        public RegistrationSagaStateMachineTestHarness(ISagaRepositoryDecoratorRegistration<TInstance> registration, ISagaRepository<TInstance> repository,
-            TStateMachine stateMachine)
-            : base(repository, registration.TestTimeout)
+        public RegistrationSagaStateMachineTestHarness(ISagaRepositoryDecoratorRegistration<TInstance> registration,
+            IQuerySagaRepository<TInstance> querySagaRepository, ILoadSagaRepository<TInstance> loadSagaRepository, TStateMachine stateMachine)
+            : base(querySagaRepository, loadSagaRepository, registration.TestTimeout)
         {
             StateMachine = stateMachine;
             Consumed = registration.Consumed;

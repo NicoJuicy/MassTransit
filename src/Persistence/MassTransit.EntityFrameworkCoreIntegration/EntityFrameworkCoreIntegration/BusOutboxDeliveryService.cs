@@ -6,6 +6,7 @@ namespace MassTransit.EntityFrameworkCoreIntegration
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Internals;
     using Logging;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Storage;
@@ -29,7 +30,9 @@ namespace MassTransit.EntityFrameworkCoreIntegration
         readonly ILogger _logger;
         readonly IBusOutboxNotification _notification;
         readonly OutboxDeliveryServiceOptions _options;
+        readonly Func<TDbContext, Guid, long, int, IAsyncEnumerable<OutboxMessage>> _outboxMessagesQuery;
         readonly IServiceProvider _provider;
+
         string _getOutboxIdStatement;
 
         public BusOutboxDeliveryService(IBusControl busControl, IOptions<OutboxDeliveryServiceOptions> options,
@@ -45,6 +48,13 @@ namespace MassTransit.EntityFrameworkCoreIntegration
 
             _lockStatementProvider = outboxOptions.Value.LockStatementProvider;
             _isolationLevel = outboxOptions.Value.IsolationLevel;
+
+            _outboxMessagesQuery = EF.CompileAsyncQuery((TDbContext context, Guid outboxId, long lastSequenceNumber, int limit) =>
+                context.Set<OutboxMessage>()
+                    .Where(x => x.OutboxId == outboxId && x.SequenceNumber > lastSequenceNumber)
+                    .OrderBy(x => x.SequenceNumber)
+                    .Take(limit)
+                    .AsNoTracking());
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,20 +62,29 @@ namespace MassTransit.EntityFrameworkCoreIntegration
             using var algorithm = new RequestRateAlgorithm(new RequestRateAlgorithmOptions
             {
                 PrefetchCount = _options.QueryMessageLimit,
-                RequestResultLimit = 10
+                RequestResultLimit = 10,
             });
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await _notification.WaitForDelivery(stoppingToken).ConfigureAwait(false);
-
                     await _busControl.WaitForHealthStatus(BusHealthStatus.Healthy, stoppingToken).ConfigureAwait(false);
 
-                    await algorithm.Run(DeliverOutbox, stoppingToken).ConfigureAwait(false);
+                    var count = await algorithm.Run(DeliverOutbox, stoppingToken).ConfigureAwait(false);
+                    if (count > 0)
+                        continue;
+
+                    await _notification.WaitForDelivery(stoppingToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
+                {
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                }
+                catch (InvalidOperationException exception) when (exception.InnerException != null
+                                                                  && exception.InnerException.Message.Contains("concurrent update"))
                 {
                 }
                 catch (Exception exception)
@@ -76,23 +95,6 @@ namespace MassTransit.EntityFrameworkCoreIntegration
         }
 
         async Task<int> DeliverOutbox(int resultLimit, CancellationToken cancellationToken)
-        {
-            var resultCount = 0;
-
-            for (var i = 0; i < resultLimit; i++)
-            {
-                var messageCount = await DeliverOutbox(cancellationToken).ConfigureAwait(false);
-                if (messageCount > 0)
-                    resultCount++;
-
-                if (messageCount == 0)
-                    break;
-            }
-
-            return resultCount;
-        }
-
-        async Task<int> DeliverOutbox(CancellationToken cancellationToken)
         {
             var scope = _provider.CreateAsyncScope();
 
@@ -113,10 +115,11 @@ namespace MassTransit.EntityFrameworkCoreIntegration
 
                     try
                     {
-                        var outboxState = await dbContext.Set<OutboxState>()
+                        List<OutboxState> outboxStateList = await dbContext.Set<OutboxState>()
                             .FromSqlRaw(_getOutboxIdStatement)
                             .AsTracking()
-                            .SingleOrDefaultAsync(timeoutToken.Token).ConfigureAwait(false);
+                            .ToListAsync(timeoutToken.Token).ConfigureAwait(false);
+                        var outboxState = outboxStateList.SingleOrDefault();
 
                         if (outboxState == null)
                             return -1;
@@ -145,14 +148,9 @@ namespace MassTransit.EntityFrameworkCoreIntegration
                     {
                         throw;
                     }
-                    catch (DbUpdateConcurrencyException)
+                    catch (InvalidOperationException exception) when (exception.InnerException != null
+                                                                      && exception.InnerException.Message.Contains("concurrent update"))
                     {
-                        await RollbackTransaction(transaction).ConfigureAwait(false);
-                        throw;
-                    }
-                    catch (DbUpdateException)
-                    {
-                        await RollbackTransaction(transaction).ConfigureAwait(false);
                         throw;
                     }
                     catch (Exception)
@@ -162,16 +160,17 @@ namespace MassTransit.EntityFrameworkCoreIntegration
                     }
                 }
 
-                var messageCount = 0;
+                var executionStrategy = dbContext.Database.CreateExecutionStrategy();
 
-                var executeResult = 1;
-                while (executeResult >= 0)
+                var messageCount = 0;
+                while (messageCount < resultLimit)
                 {
-                    var executionStrategy = dbContext.Database.CreateExecutionStrategy();
-                    if (executionStrategy is ExecutionStrategy)
-                        executeResult = await executionStrategy.ExecuteAsync(() => Execute()).ConfigureAwait(false);
-                    else
-                        executeResult = await Execute().ConfigureAwait(false);
+                    var executeResult = executionStrategy is ExecutionStrategy
+                        ? await executionStrategy.ExecuteAsync(() => Execute()).ConfigureAwait(false)
+                        : await Execute().ConfigureAwait(false);
+
+                    if (executeResult < 0)
+                        break;
 
                     if (executeResult > 0)
                         messageCount += executeResult;
@@ -192,7 +191,6 @@ namespace MassTransit.EntityFrameworkCoreIntegration
         {
             List<OutboxMessage> messages = await dbContext.Set<OutboxMessage>()
                 .Where(x => x.OutboxId == outboxState.OutboxId)
-                .OrderBy(x => x.SequenceNumber)
                 .ToListAsync(cancellationToken);
 
             dbContext.RemoveRange(messages);
@@ -213,12 +211,9 @@ namespace MassTransit.EntityFrameworkCoreIntegration
 
             var lastSequenceNumber = outboxState.LastSequenceNumber ?? 0;
 
-            List<OutboxMessage> messages = await dbContext.Set<OutboxMessage>()
-                .Where(x => x.OutboxId == outboxState.OutboxId && x.SequenceNumber > lastSequenceNumber)
-                .OrderBy(x => x.SequenceNumber)
-                .Take(messageLimit)
-                .AsNoTracking()
-                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            IList<OutboxMessage> messages = await _outboxMessagesQuery(dbContext, outboxState.OutboxId, lastSequenceNumber, messageLimit)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             var sentSequenceNumber = 0L;
 
@@ -249,13 +244,22 @@ namespace MassTransit.EntityFrameworkCoreIntegration
                         var endpoint = await _busControl.GetSendEndpoint(message.DestinationAddress).ConfigureAwait(false);
 
                         StartedActivity? activity = LogContext.Current?.StartOutboxDeliverActivity(message);
+                        StartedInstrument? instrument = LogContext.Current?.StartOutboxDeliveryInstrument(message);
+
                         try
                         {
                             await endpoint.Send(new SerializedMessageBody(), pipe, token.Token).ConfigureAwait(false);
                         }
+                        catch (Exception ex)
+                        {
+                            activity?.AddExceptionEvent(ex);
+                            instrument?.AddException(ex);
+                            throw;
+                        }
                         finally
                         {
                             activity?.Stop();
+                            instrument?.Stop();
                         }
 
                         sentSequenceNumber = message.SequenceNumber;
@@ -288,16 +292,15 @@ namespace MassTransit.EntityFrameworkCoreIntegration
 
             if (messageIndex == messages.Count && messages.Count < messageLimit)
             {
+                outboxState.Delivered = DateTime.UtcNow;
+
                 if (hasLastSequenceNumber == false)
                 {
                     dbContext.Remove(outboxState);
                     dbContext.RemoveRange(messages);
                 }
                 else
-                {
-                    outboxState.Delivered = DateTime.UtcNow;
                     dbContext.Update(outboxState);
-                }
 
                 saveChanges = true;
 

@@ -11,7 +11,7 @@ namespace MassTransit.RabbitMqTransport.Topology
         RabbitMqExchangeConfigurator,
         SendSettings
     {
-        readonly IList<ExchangeBindingPublishTopologySpecification> _exchangeBindings;
+        readonly List<ExchangeBindingPublishTopologySpecification> _exchangeBindings;
         bool _bindToQueue;
         string _queueName;
 
@@ -35,7 +35,7 @@ namespace MassTransit.RabbitMqTransport.Topology
             }
 
             if (!string.IsNullOrWhiteSpace(address.AlternateExchange))
-                SetExchangeArgument("alternate-exchange", address.AlternateExchange);
+                SetExchangeArgument(Headers.AlternateExchange, address.AlternateExchange);
 
             if (address.SingleActiveConsumer)
                 SetQueueArgument(Headers.XSingleActiveConsumer, true);
@@ -46,8 +46,9 @@ namespace MassTransit.RabbitMqTransport.Topology
         public RabbitMqEndpointAddress GetSendAddress(Uri hostAddress)
         {
             return new RabbitMqEndpointAddress(hostAddress, ExchangeName, ExchangeType, Durable, AutoDelete, _bindToQueue, _queueName,
-                ExchangeArguments.ContainsKey("x-delayed-type") ? (string)ExchangeArguments["x-delayed-type"] : default,
-                _exchangeBindings.Count > 0 ? _exchangeBindings.Select(x => x.ExchangeName).ToArray() : default);
+                ExchangeArguments.TryGetValue("x-delayed-type", out var argument) ? (string)argument : default,
+                _exchangeBindings.Count > 0 ? _exchangeBindings.Select(x => x.ExchangeName).ToArray() : default,
+                alternateExchange: ExchangeArguments.TryGetValue(Headers.AlternateExchange, out argument) ? (string)argument : default);
         }
 
         public BrokerTopology GetBrokerTopology()
@@ -80,9 +81,18 @@ namespace MassTransit.RabbitMqTransport.Topology
 
         public void BindToExchange(string exchangeName, Action<IRabbitMqExchangeBindingConfigurator> configure = null)
         {
-            var specification = new ExchangeBindingPublishTopologySpecification(exchangeName, RabbitMQ.Client.ExchangeType.Fanout, Durable, AutoDelete);
+            string exchangeType = ExchangeArguments.TryGetValue("x-delayed-type", out var argument) ? (string)argument : RabbitMQ.Client.ExchangeType.Fanout;
+            var specification = new ExchangeBindingPublishTopologySpecification(exchangeName, exchangeType, Durable, AutoDelete);
 
             configure?.Invoke(specification);
+
+            _exchangeBindings.Add(specification);
+        }
+
+        public void BindToExchange(RabbitMqEndpointAddress address)
+        {
+            string exchangeType = ExchangeArguments.TryGetValue("x-delayed-type", out var argument) ? (string)argument : RabbitMQ.Client.ExchangeType.Fanout;
+            var specification = new ExchangeBindingPublishTopologySpecification(address.Name, address.ExchangeType, address.Durable, address.AutoDelete);
 
             _exchangeBindings.Add(specification);
         }

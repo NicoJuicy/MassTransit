@@ -1,8 +1,6 @@
 name: MassTransit
 env:
-  MASSTRANSIT_VERSION: 8.0.14
-  DOTNET_CLI_TELEMETRY_OPTOUT: 1
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: true
+  MASSTRANSIT_VERSION: 8.3.5
 on:
   push:
     paths:
@@ -10,20 +8,24 @@ on:
       - 'tests/**'
       - 'MassTransit.sln'
       - 'Directory.Build.props'
+      - 'Directory.Packages.props'
       - '**/build.yml'
+    branches:
+      - '**'
   pull_request:
     paths:
       - 'src/**'
       - 'tests/**'
       - 'MassTransit.sln'
       - 'Directory.Build.props'
+      - 'Directory.Packages.props'
       - '**/build.yml'
   workflow_dispatch:
 
 jobs:
   compile:
     name: Build
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       max-parallel: 2
       matrix:
@@ -31,12 +33,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Restore NuGet packages
         run: dotnet restore
@@ -46,47 +48,26 @@ jobs:
         run: dotnet build -c Release --no-restore
         working-directory: ./
 
-      - name: Test Analyzers
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --no-build --filter Category!=Flaky
-        working-directory: tests/MassTransit.Analyzers.Tests
-
   test-ubuntu:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Unit Tests
-        run: dotnet test -c Release -f net6.0 --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release -f net9.0 --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.Tests
 
       - name: Test Abstractions
-        run: dotnet test -c Release -f net6.0 --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release -f net9.0 --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.Abstractions.Tests
-
-  test-containers:
-    name: Container Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-
-      - name: Install .NET Core SDK 6.0
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '6.0.x'
-
-      - name: Test Containers
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
-        working-directory: tests/MassTransit.Containers.Tests
 
   test-activemq:
     name: "Transports: ActiveMQ"
@@ -100,51 +81,70 @@ jobs:
           - "8161:8161"
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test ActiveMQ
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.ActiveMqTransport.Tests
 
-  test-grpc:
-    name: "Transports: gRPC"
+  test-sql-transport:
+    name: "Transport: SQL"
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/azure-sql-edge
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: "Password12!"
+        ports:
+          - 1433:1433
+      postgres:
+        image: postgres:14.7
+        env:
+          POSTGRES_PASSWORD: "Password12!"
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: false
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
-      - name: Test gRPC
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
-        working-directory: tests/MassTransit.GrpcTransport.Tests
+      - name: Test Database Transport
+        run: dotnet test -c Release --logger GitHubActions --filter "Category!=Flaky&Category!=Integration"
+        working-directory: tests/MassTransit.SqlTransport.Tests
+
+
   test-azure-service-bus:
     name: "Transports: Azure Service Bus"
     if: false # too flaky at this point
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test Azure Service Bus
         env:
           MT_ASB_KEYVALUE: ${{ secrets.AZURE_SERVICEBUS }}
           MT_AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE }}
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.Azure.ServiceBus.Core.Tests
   test-rabbitmq:
     name: "Transports: RabbitMQ"
@@ -159,78 +159,86 @@ jobs:
         options: --health-cmd "rabbitmqctl node_health_check" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test RabbitMQ
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.RabbitMqTransport.Tests
   test-sqs:
-    name: "Transports: SQS"
+    name: "Transports: SQS (+S3)"
     timeout-minutes: 10
     runs-on: ubuntu-latest
     services:
       localstack:
-        image: localstack/localstack:0.12.17.5
+        image: localstack/localstack:3.0.2
         ports:
           - "4566:4566"
           - "4571:4571"
-          - "8080:8080"
-        options: --health-cmd "curl --fail http://localhost:4566/health || exit 1" --health-interval 10s --health-timeout 5s --health-retries 5
+        options: --health-cmd "curl --fail http://localhost:4566/health || exit 1" --health-interval 10s --health-timeout 5s --health-retries 5 --health-start-period 15s
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test SQS
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.AmazonSqsTransport.Tests
   test-azure-table:
     name: "Storage: Azure Table"
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/v8') && github.repository == 'MassTransit/MassTransit'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
+
+      - name: Spin up test environment
+        run: |
+          docker compose -f docker-compose.yml up -d
+        working-directory: tests/MassTransit.Azure.Table.Tests
 
       - name: Test Azure Table
         env:
           MT_AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE }}
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter "Category!=Flaky&Category!=Integration"
+        run: dotnet test -c Release --logger GitHubActions --filter "Category!=Flaky&Category!=Integration"
+        working-directory: tests/MassTransit.Azure.Table.Tests
+
+      - name: Stop test environment
+        run: |
+          docker compose -f docker-compose.yml down
         working-directory: tests/MassTransit.Azure.Table.Tests
   test-cosmosdb:
     name: "Storage: CosmosDB"
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/v8') && github.repository == 'MassTransit/MassTransit'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') && github.repository == 'MassTransit/MassTransit'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test CosmosDB
         env:
           MT_COSMOS_ENDPOINT: ${{ secrets.AZURE_COSMOSENDPOINT }}
           MT_COSMOS_KEY: ${{ secrets.AZURE_COSMOSKEY }}
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter "Category!=Flaky&Category!=Integration"
+        run: dotnet test -c Release --logger GitHubActions --filter "Category!=Flaky&Category!=Integration"
         working-directory: tests/MassTransit.Azure.Cosmos.Tests
   test-dapper:
     name: "Storage: Dapper"
@@ -238,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mssql:
-        image: mcr.microsoft.com/mssql/server:2017-latest
+        image: mcr.microsoft.com/azure-sql-edge
         env:
           ACCEPT_EULA: Y
           SA_PASSWORD: "Password12!"
@@ -249,15 +257,15 @@ jobs:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: false
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test Dapper
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter "Category!=Flaky&Category!=Integration"
+        run: dotnet test -c Release --logger GitHubActions --filter "Category!=Flaky&Category!=Integration"
         working-directory: tests/MassTransit.DapperIntegration.Tests
   test-entity-framework:
     name: "Storage: EntityFramework"
@@ -265,7 +273,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mssql:
-        image: mcr.microsoft.com/mssql/server:2017-latest
+        image: mcr.microsoft.com/azure-sql-edge
         env:
           ACCEPT_EULA: Y
           SA_PASSWORD: "Password12!"
@@ -283,19 +291,19 @@ jobs:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: false
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
-      - name: Test EntityFrameworkCore 6.0
-        run: dotnet test -c Release --logger:"console;verbosity=normal" -f net6.0 --filter "Category!=Flaky&Category!=Integration"
+      - name: Test EntityFrameworkCore
+        run: dotnet test -c Release --logger GitHubActions --filter "Category!=Flaky&Category!=Integration"
         working-directory: tests/MassTransit.EntityFrameworkCoreIntegration.Tests
 
       - name: Test EntityFramework
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter "Category!=Flaky&Category!=Integration"
+        run: dotnet test -c Release --logger GitHubActions --filter "Category!=Flaky&Category!=Integration"
         working-directory: tests/MassTransit.EntityFrameworkIntegration.Tests
   test-marten:
     name: "Storage: Marten"
@@ -311,36 +319,41 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test Marten
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.MartenIntegration.Tests
   test-mongo:
     name: "Storage: MongoDB"
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    services:
-      mongo:
-        image: mongo
-        ports:
-        - '27017-27019:27017-27019'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
+
+      - name: Spin up test environment
+        run: |
+          docker compose -f docker-compose.yml up -d
+        working-directory: tests/MassTransit.MongoDbIntegration.Tests
 
       - name: Test MongoDB
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
+        working-directory: tests/MassTransit.MongoDbIntegration.Tests
+
+      - name: Stop test environment
+        run: |
+          docker compose -f docker-compose.yml down
         working-directory: tests/MassTransit.MongoDbIntegration.Tests
   test-nhibernate:
     name: "Storage: NHibernate"
@@ -348,15 +361,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test NHibernate
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.NHibernateIntegration.Tests
   test-redis:
     name: "Storage: Redis"
@@ -370,15 +383,37 @@ jobs:
         options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test Redis
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
+        working-directory: tests/MassTransit.RedisIntegration.Tests
+  test-valkey:
+    name: "Storage: Valkey"
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey:8
+        ports:
+          - '6379:6379'
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Test Valkey
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.RedisIntegration.Tests
   test-hangfire:
     name: "Scheduler: Hangfire"
@@ -386,15 +421,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test Hangfire
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.HangfireIntegration.Tests
   test-quartz:
     name: "Scheduler: Quartz"
@@ -402,91 +437,68 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test Quartz
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.QuartzIntegration.Tests
   test-eventhub:
     name: "Rider: EventHub"
     runs-on: ubuntu-latest
-    if: false # turned off for flakey
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
+
+      - name: Spin up test environment
+        run: |
+          docker compose -f docker-compose.yml up -d
+        working-directory: tests/MassTransit.EventHubIntegration.Tests
 
       - name: Test EventHub
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         env:
           MT_EH_NAMESPACE: ${{ secrets.AZURE_EVENTHUB }}
           MT_AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE }}
         working-directory: tests/MassTransit.EventHubIntegration.Tests
+
+      - name: Stop test environment
+        run: |
+          docker compose -f docker-compose.yml down
+        working-directory: tests/MassTransit.EventHubIntegration.Tests
   test-kafka:
     name: "Rider: Kafka"
     runs-on: ubuntu-latest
-    if: true # turned off for flakey
-    services:
-      zookeeper:
-        image: confluentinc/cp-zookeeper:latest
-        ports:
-          - "2181:2181"
-        env:
-          ZOOKEEPER_CLIENT_PORT: 2181
-          ZOOKEEPER_TICK_TIME: 2000
-      broker:
-        image: confluentinc/cp-kafka:latest
-        ports:
-          - "29092:29092"
-          - "9092:9092"
-          - "9101:9101"
-        env:
-          KAFKA_BROKER_ID: 1
-          KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
-          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-          KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
-          KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
-          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-          KAFKA_JMX_PORT: 9101
-          KAFKA_JMX_HOSTNAME: localhost
-          KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-          CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
-          CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
-          CONFLUENT_METRICS_ENABLE: 'false'
-        options: --health-cmd "nc -vz localhost 9092 || exit 1" --health-interval 10s --health-timeout 5s --health-retries 5
-      schema-registry:
-        image: confluentinc/cp-schema-registry:latest
-        ports:
-          - "8081:8081"
-        env:
-          SCHEMA_REGISTRY_HOST_NAME: schema-registry
-          SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
-          SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-        options: --health-cmd "curl --fail http://localhost:8081/subjects || exit 1" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
+
+      - name: Spin up test environment
+        run: |
+          docker compose -f docker-compose.yml up -d
+        working-directory: tests/MassTransit.KafkaIntegration.Tests
 
       - name: Test Kafka
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
+        working-directory: tests/MassTransit.KafkaIntegration.Tests
+
+      - name: Stop test environment
+        run: |
+          docker compose -f docker-compose.yml down
         working-directory: tests/MassTransit.KafkaIntegration.Tests
 
   test-signalr:
@@ -495,15 +507,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Test SignalR
-        run: dotnet test -c Release --logger:"console;verbosity=normal" --filter Category!=Flaky
+        run: dotnet test -c Release --logger GitHubActions --filter Category!=Flaky
         working-directory: tests/MassTransit.SignalR.Tests
 
   calc-version:
@@ -512,12 +524,11 @@ jobs:
     needs:
       - compile
       - test-ubuntu
-      - test-containers
       - test-activemq
       # - test-azure-service-bus
-      - test-grpc
       - test-rabbitmq
       - test-sqs
+      - test-sql-transport
       - test-azure-table
       - test-cosmosdb
       - test-dapper
@@ -526,6 +537,7 @@ jobs:
       - test-mongo
       - test-nhibernate
       - test-redis
+      - test-valkey
       - test-hangfire
       - test-quartz
       # - test-eventhub
@@ -546,7 +558,10 @@ jobs:
     name: Build and Publish NuGets
     timeout-minutes: 60
     runs-on: windows-latest
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/v8') && github.repository == 'MassTransit/MassTransit' && success()
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') && github.repository == 'MassTransit/MassTransit' && success()
+    env:
+      DOTNET_INSTALL_DIR: D:\dotnet
+      NUGET_PACKAGES: D:\.nuget\packages
     needs:
       - calc-version
     steps:
@@ -555,232 +570,20 @@ jobs:
           echo "${{ needs.calc-version.outputs.version }}"
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install .NET Core SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '9.0.x'
 
-      - name: Build and Publish MassTransit
-        # was: brandedoutcast/publish-nuget@v2.5.5
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit/MassTransit.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit Abstractions
-        # was: brandedoutcast/publish-nuget@v2.5.5
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.Abstractions/MassTransit.Abstractions.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit Newtonsoft
-        # was: brandedoutcast/publish-nuget@v2.5.5
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.Newtonsoft/MassTransit.Newtonsoft.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Analyzers
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.Analyzers/MassTransit.Analyzers.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-          include-symbols: false
-      - name: Build and Publish MassTransit.Interop.NServiceBus
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.Interop.NServiceBus/MassTransit.Interop.NServiceBus.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.PrometheusIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.PrometheusIntegration/MassTransit.PrometheusIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.SignalR
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.SignalR/MassTransit.SignalR.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.TestFramework
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.TestFramework/MassTransit.TestFramework.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Azure.Cosmos
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.Azure.Cosmos/MassTransit.Azure.Cosmos.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Azure.Storage
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.Azure.Storage/MassTransit.Azure.Storage.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Azure.Table
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.Azure.Table/MassTransit.Azure.Table.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.DapperIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.DapperIntegration/MassTransit.DapperIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.DynamoDb
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.DynamoDbIntegration/MassTransit.DynamoDbIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.EntityFrameworkCoreIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.EntityFrameworkCoreIntegration/MassTransit.EntityFrameworkCoreIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.EntityFrameworkIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.EntityFrameworkIntegration/MassTransit.EntityFrameworkIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.MartenIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.MartenIntegration/MassTransit.MartenIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.MongoDbIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.MongoDbIntegration/MassTransit.MongoDbIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.NHibernateIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.NHibernateIntegration/MassTransit.NHibernateIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.RedisIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Persistence/MassTransit.RedisIntegration/MassTransit.RedisIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.HangfireIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Scheduling/MassTransit.HangfireIntegration/MassTransit.HangfireIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.QuartzIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Scheduling/MassTransit.QuartzIntegration/MassTransit.QuartzIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.ActiveMqTransport
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.ActiveMqTransport/MassTransit.ActiveMqTransport.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.AmazonSqsTransport
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.AmazonSqsTransport/MassTransit.AmazonSqsTransport.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Azure.ServiceBus.Core
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.Azure.ServiceBus.Core/MassTransit.Azure.ServiceBus.Core.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.EventHubIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.EventHubIntegration/MassTransit.EventHubIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Grpc
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.GrpcTransport/MassTransit.GrpcTransport.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.KafkaIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.KafkaIntegration/MassTransit.KafkaIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.RabbitMqTransport
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.RabbitMqTransport/MassTransit.RabbitMqTransport.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.Visualizer
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/MassTransit.StateMachineVisualizer/MassTransit.StateMachineVisualizer.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.WebJobs.EventHubsIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.WebJobs.EventHubsIntegration/MassTransit.WebJobs.EventHubsIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
-      - name: Build and Publish MassTransit.WebJobs.ServiceBusIntegration
-        uses: drusellers/publish-nuget@master
-        with:
-          project-file-path: src/Transports/MassTransit.WebJobs.ServiceBusIntegration/MassTransit.WebJobs.ServiceBusIntegration.csproj
-          version: ${{ needs.calc-version.outputs.version }}
-          tag-commit: false
-          nuget-key: ${{secrets.NUGET_API_KEY}}
+      - name: Build and Pack Solution
+        run: |
+          dotnet build -c Release -p:Version=${{ needs.calc-version.outputs.version }}
+          dotnet pack --no-build -c Release -p:PackageVersion=${{ needs.calc-version.outputs.version }} -o ./artifacts
+
+      - name: Publish NuGets
+        working-directory: artifacts
+        run: |
+          dotnet nuget push * -s https://api.nuget.org/v3/index.json -k ${{secrets.NUGET_API_KEY}} --skip-duplicate --no-symbols
 

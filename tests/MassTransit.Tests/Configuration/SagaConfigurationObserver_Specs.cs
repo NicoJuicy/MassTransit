@@ -20,7 +20,7 @@ namespace MassTransit.Tests.Configuration
 
                 cfg.ReceiveEndpoint("hello", e =>
                 {
-                    e.UseRetry(x => x.Immediate(1));
+                    e.UseMessageRetry(x => x.Immediate(1));
 
                     e.Saga(new InMemorySagaRepository<MySaga>(), x =>
                     {
@@ -35,9 +35,12 @@ namespace MassTransit.Tests.Configuration
                 });
             });
 
-            Assert.That(observer.SagaTypes.Contains(typeof(MySaga)));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MySaga), typeof(PingMessage))));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MySaga), typeof(PongMessage))));
+            Assert.Multiple(() =>
+            {
+                Assert.That(observer.SagaTypes, Does.Contain(typeof(MySaga)));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MySaga), typeof(PingMessage))));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MySaga), typeof(PongMessage))));
+            });
         }
 
 

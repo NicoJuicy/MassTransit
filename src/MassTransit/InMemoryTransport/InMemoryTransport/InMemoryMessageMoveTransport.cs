@@ -1,10 +1,8 @@
 namespace MassTransit.InMemoryTransport
 {
     using System;
-    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
-    using Transports;
     using Transports.Fabric;
 
 
@@ -17,17 +15,13 @@ namespace MassTransit.InMemoryTransport
             _exchange = exchange;
         }
 
-        protected async Task Move(ReceiveContext context, Action<InMemoryTransportMessage, IDictionary<string, object>> preSend)
+        protected async Task Move(ReceiveContext context, Action<InMemoryTransportMessage, SendHeaders> preSend)
         {
             var messageId = context.GetMessageId(NewId.NextGuid());
 
             var body = context.GetBody();
 
-            var messageType = "Unknown";
-            if (context.TryGetPayload(out InMemoryTransportMessage receivedMessage))
-                messageType = receivedMessage.MessageType;
-
-            var transportMessage = new InMemoryTransportMessage(messageId, body, context.ContentType?.MediaType, messageType);
+            var transportMessage = new InMemoryTransportMessage(messageId, body, context.ContentType?.MediaType);
 
             transportMessage.Headers.SetHostHeaders();
 

@@ -30,7 +30,7 @@ namespace MassTransit.RabbitMqTransport.Tests
 
             await InactivityTask;
 
-            Assert.LessOrEqual(_attempts[pingId], _limit + 1);
+            Assert.That(_attempts[pingId], Is.LessThanOrEqualTo(_limit + 1));
         }
 
         readonly int _limit;
@@ -45,7 +45,7 @@ namespace MassTransit.RabbitMqTransport.Tests
 
         protected override void ConfigureRabbitMqReceiveEndpoint(IRabbitMqReceiveEndpointConfigurator configurator)
         {
-            configurator.UseRetry(x => x.Interval(_limit, 200));
+            configurator.UseMessageRetry(x => x.Interval(_limit, 200));
 
             configurator.Consumer(() => new RetryLimitConsumer(_attempts));
         }
@@ -92,7 +92,7 @@ namespace MassTransit.RabbitMqTransport.Tests
 
             await InactivityTask;
 
-            Assert.LessOrEqual(_attempts[pingId], _limit + 1);
+            Assert.That(_attempts[pingId], Is.LessThanOrEqualTo(_limit + 1));
         }
 
         readonly int _limit;
@@ -140,7 +140,7 @@ namespace MassTransit.RabbitMqTransport.Tests
 
             await InactivityTask;
 
-            Assert.LessOrEqual(_attempts[pingId], _limit + 1);
+            Assert.That(_attempts[pingId], Is.LessThanOrEqualTo(_limit + 1));
         }
 
         readonly int _limit;
@@ -188,7 +188,7 @@ namespace MassTransit.RabbitMqTransport.Tests
 
             await InactivityTask;
 
-            Assert.LessOrEqual(_attempts[pingId], _limit + 1);
+            Assert.That(_attempts[pingId], Is.LessThanOrEqualTo(_limit + 1));
         }
 
         readonly int _limit;
@@ -234,7 +234,7 @@ namespace MassTransit.RabbitMqTransport.Tests
 
             await InactivityTask;
 
-            Assert.LessOrEqual(_attempts[pingId], _limit + 1);
+            Assert.That(_attempts[pingId], Is.LessThanOrEqualTo(_limit + 1));
         }
 
         readonly int _limit;

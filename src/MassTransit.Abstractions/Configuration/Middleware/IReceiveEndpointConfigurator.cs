@@ -10,6 +10,7 @@ namespace MassTransit
     /// </summary>
     public interface IReceiveEndpointConfigurator :
         IEndpointConfigurator,
+        IReceiveEndpointObserverConnector,
         IReceiveEndpointDependencyConnector,
         IReceiveEndpointDependentConnector
     {
@@ -58,6 +59,12 @@ namespace MassTransit
         /// </summary>
         void ConfigureMessageTopology<T>(bool enabled = true)
             where T : class;
+
+        /// <summary>
+        /// Configures whether the broker topology is configured for the specified message type. Related to
+        /// <see cref="ConfigureConsumeTopology" />, but for an individual message type.
+        /// </summary>
+        void ConfigureMessageTopology(Type messageType, bool enabled = true);
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         void AddEndpointSpecification(IReceiveEndpointSpecification configurator);

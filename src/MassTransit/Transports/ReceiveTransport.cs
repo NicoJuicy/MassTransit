@@ -101,8 +101,6 @@ namespace MassTransit.Transports
             {
                 LogContext.SetCurrentIfNull(_context.LogContext);
 
-                TransportLogMessages.StoppingReceiveTransport(_context.InputAddress);
-
                 if (_supervisor != null)
                     await _supervisor.Stop(context).ConfigureAwait(false);
 
@@ -111,6 +109,18 @@ namespace MassTransit.Transports
 
             async Task Run()
             {
+                async Task DelayWithCancellation(TimeSpan delay)
+                {
+                    try
+                    {
+                        await Task.Delay(delay, Stopping).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // just a little breather before reconnecting the receive transport
+                    }
+                }
+
                 var stoppingContext = new TransportStoppingContext(Stopping);
 
                 RetryPolicyContext<TransportStoppingContext> policyContext = _retryPolicy.CreatePolicyContext(stoppingContext);
@@ -123,8 +133,13 @@ namespace MassTransit.Transports
                     {
                         try
                         {
-                            if (retryContext?.Delay != null)
-                                await Task.Delay(retryContext.Delay.Value, Stopping).ConfigureAwait(false);
+                            if (retryContext != null)
+                            {
+                                LogContext.Info?.Log(retryContext.Exception, "Retrying {Delay}: {Message}", retryContext.Delay, retryContext.Exception.Message);
+
+                                if (retryContext.Delay != null)
+                                    await DelayWithCancellation(retryContext.Delay.Value).ConfigureAwait(false);
+                            }
 
                             if (!IsStopping)
                                 await RunTransport().ConfigureAwait(false);
@@ -147,7 +162,7 @@ namespace MassTransit.Transports
 
                             if (retryContext == null && !policyContext.CanRetry(exception, out retryContext))
                             {
-                                LogContext.Debug?.Log(exception, "ReceiveTransport Cannot Retry: {InputAddress}", _context.InputAddress);
+                                LogContext.Error?.Log(exception, "ReceiveTransport Cannot Retry: {InputAddress}", _context.InputAddress);
                                 break;
                             }
                         }
@@ -155,14 +170,7 @@ namespace MassTransit.Transports
                         if (IsStopping)
                             break;
 
-                        try
-                        {
-                            await Task.Delay(TimeSpan.FromSeconds(1), Stopping).ConfigureAwait(false);
-                        }
-                        catch
-                        {
-                            // just a little breather before reconnecting the receive transport
-                        }
+                        await DelayWithCancellation(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException exception)
@@ -189,7 +197,9 @@ namespace MassTransit.Transports
                     if (_preStartPipe.IsNotEmpty())
                         await _supervisor.Send(_preStartPipe, Stopping).ConfigureAwait(false);
 
-                    await _context.OnTransportStartup(_supervisor, Stopping).ConfigureAwait(false);
+                    // Nothing connected to the pipe, so signal early we are available
+                    if (!_context.ReceivePipe.Connected.IsCompleted)
+                        await _context.OnTransportStartup(_supervisor, Stopping).ConfigureAwait(false);
 
                     if (!IsStopping)
                         await _supervisor.Send(_transportPipe, Stopped).ConfigureAwait(false);

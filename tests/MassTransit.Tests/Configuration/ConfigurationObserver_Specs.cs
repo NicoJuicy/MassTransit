@@ -21,7 +21,7 @@ namespace MassTransit.Tests.Configuration
 
                 cfg.ReceiveEndpoint("hello", e =>
                 {
-                    e.UseRetry(x => x.Immediate(1));
+                    e.UseMessageRetry(x => x.Immediate(1));
 
                     e.Consumer<MyConsumer>(x =>
                     {
@@ -36,9 +36,12 @@ namespace MassTransit.Tests.Configuration
                 });
             });
 
-            Assert.That(observer.ConsumerTypes.Contains(typeof(MyConsumer)));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MyConsumer), typeof(PingMessage))));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MyConsumer), typeof(PongMessage))));
+            Assert.Multiple(() =>
+            {
+                Assert.That(observer.ConsumerTypes, Does.Contain(typeof(MyConsumer)));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MyConsumer), typeof(PingMessage))));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MyConsumer), typeof(PongMessage))));
+            });
         }
 
         [Test]
@@ -52,15 +55,18 @@ namespace MassTransit.Tests.Configuration
 
                 cfg.ReceiveEndpoint("hello", e =>
                 {
-                    e.UseRetry(x => x.Immediate(1));
+                    e.UseMessageRetry(x => x.Immediate(1));
 
                     e.Consumer(typeof(MyConsumer), _ => new MyConsumer());
                 });
             });
 
-            Assert.That(observer.ConsumerTypes.Contains(typeof(MyConsumer)));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MyConsumer), typeof(PingMessage))));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MyConsumer), typeof(PongMessage))));
+            Assert.Multiple(() =>
+            {
+                Assert.That(observer.ConsumerTypes, Does.Contain(typeof(MyConsumer)));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MyConsumer), typeof(PingMessage))));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MyConsumer), typeof(PongMessage))));
+            });
         }
 
         [Test]
@@ -74,7 +80,7 @@ namespace MassTransit.Tests.Configuration
 
                 cfg.ReceiveEndpoint("hello", e =>
                 {
-                    e.UseRetry(x => x.Immediate(1));
+                    e.UseMessageRetry(x => x.Immediate(1));
 
                     e.Handler<PingMessage>(async context =>
                     {
@@ -82,7 +88,7 @@ namespace MassTransit.Tests.Configuration
                 });
             });
 
-            Assert.That(observer.MessageTypes.Contains(typeof(PingMessage)));
+            Assert.That(observer.MessageTypes, Does.Contain(typeof(PingMessage)));
         }
 
         [Test]
@@ -96,15 +102,18 @@ namespace MassTransit.Tests.Configuration
 
                 cfg.ReceiveEndpoint("hello", e =>
                 {
-                    e.UseRetry(x => x.Immediate(1));
+                    e.UseMessageRetry(x => x.Immediate(1));
 
                     e.Consumer<MyConsumer>();
                 });
             });
 
-            Assert.That(observer.ConsumerTypes.Contains(typeof(MyConsumer)));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MyConsumer), typeof(PingMessage))));
-            Assert.That(observer.MessageTypes.Contains(Tuple.Create(typeof(MyConsumer), typeof(PongMessage))));
+            Assert.Multiple(() =>
+            {
+                Assert.That(observer.ConsumerTypes, Does.Contain(typeof(MyConsumer)));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MyConsumer), typeof(PingMessage))));
+                Assert.That(observer.MessageTypes, Does.Contain(Tuple.Create(typeof(MyConsumer), typeof(PongMessage))));
+            });
         }
 
         [Test]
@@ -122,7 +131,7 @@ namespace MassTransit.Tests.Configuration
                 });
             });
 
-            Assert.That(observer.ExecuteActivityTypes.Contains((typeof(SetVariableActivity), typeof(SetVariableArguments))));
+            Assert.That(observer.ExecuteActivityTypes, Does.Contain((typeof(SetVariableActivity), typeof(SetVariableArguments))));
         }
 
         [Test]
@@ -149,8 +158,11 @@ namespace MassTransit.Tests.Configuration
                 });
             });
 
-            Assert.That(observer.ActivityTypes.Contains((typeof(TestActivity), typeof(TestArguments), compensateAddress)));
-            Assert.That(observer.CompensateActivityTypes.Contains((typeof(TestActivity), typeof(TestLog))));
+            Assert.Multiple(() =>
+            {
+                Assert.That(observer.ActivityTypes, Does.Contain((typeof(TestActivity), typeof(TestArguments), compensateAddress)));
+                Assert.That(observer.CompensateActivityTypes, Does.Contain((typeof(TestActivity), typeof(TestLog))));
+            });
         }
 
 

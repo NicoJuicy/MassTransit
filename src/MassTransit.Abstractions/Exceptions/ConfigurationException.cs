@@ -35,11 +35,14 @@ namespace MassTransit
         {
         }
 
+#if NET8_0_OR_GREATER
+        [Obsolete("Formatter-based serialization is obsolete and should not be used.")]
+#endif
         protected ConfigurationException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
 
-        public IEnumerable<ValidationResult> Results { get; protected set; } = Array.Empty<ValidationResult>();
+        public IEnumerable<ValidationResult> Results { get; protected set; } = [];
     }
 }

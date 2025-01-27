@@ -30,7 +30,9 @@
                 $"actual type is {pongContext.ReceiveContext.ContentType}");
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _handled;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
@@ -68,18 +70,23 @@
 
             ConsumeContext<Command> context = await _handled;
 
-            Assert.That(context.ReceiveContext.ContentType, Is.EqualTo(NewtonsoftRawJsonMessageSerializer.RawJsonContentType),
-                $"unexpected content-type {context.ReceiveContext.ContentType}");
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.ReceiveContext.ContentType, Is.EqualTo(NewtonsoftRawJsonMessageSerializer.RawJsonContentType),
+                    $"unexpected content-type {context.ReceiveContext.ContentType}");
 
-            Assert.That(context.Message.CommandId, Is.EqualTo(message.CommandId));
-            Assert.That(context.Message.ItemNumber, Is.EqualTo(message.ItemNumber));
+                Assert.That(context.Message.CommandId, Is.EqualTo(message.CommandId));
+                Assert.That(context.Message.ItemNumber, Is.EqualTo(message.ItemNumber));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<Command>> _handled;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRawJsonSerializer();
+            configurator.UseRawJsonSerializer(RawSerializerOptions.All);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -104,6 +111,7 @@
         }
     }
 
+
     [TestFixture]
     public class Sending_and_consuming_raw_xml :
         InMemoryTestFixture
@@ -121,18 +129,23 @@
 
             ConsumeContext<Command> context = await _handled;
 
-            Assert.That(context.ReceiveContext.ContentType, Is.EqualTo(RawXmlMessageSerializer.RawXmlContentType),
-                $"unexpected content-type {context.ReceiveContext.ContentType}");
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.ReceiveContext.ContentType, Is.EqualTo(RawXmlMessageSerializer.RawXmlContentType),
+                    $"unexpected content-type {context.ReceiveContext.ContentType}");
 
-            Assert.That(context.Message.CommandId, Is.EqualTo(message.CommandId));
-            Assert.That(context.Message.ItemNumber, Is.EqualTo(message.ItemNumber));
+                Assert.That(context.Message.CommandId, Is.EqualTo(message.CommandId));
+                Assert.That(context.Message.ItemNumber, Is.EqualTo(message.ItemNumber));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<Command>> _handled;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRawXmlSerializer();
+            configurator.UseRawXmlSerializer(RawSerializerOptions.All);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)

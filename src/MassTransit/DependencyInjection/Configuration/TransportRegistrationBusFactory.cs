@@ -4,6 +4,7 @@ namespace MassTransit.Configuration
     using System.Collections.Generic;
     using System.Linq;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Options;
     using Transports;
 
 
@@ -29,11 +30,15 @@ namespace MassTransit.Configuration
 
             _hostConfiguration.LogContext = LogContext.Current;
 
+            var hostOptions = context.GetService<IOptions<MassTransitHostOptions>>()?.Value;
+            _hostConfiguration.ConsumerStopTimeout = hostOptions?.ConsumerStopTimeout;
+            _hostConfiguration.StopTimeout = hostOptions?.StopTimeout;
+
             ConnectBusObservers(context, configurator);
 
             configure?.Invoke(context, configurator);
 
-            IBusInstanceSpecification[] busInstanceSpecifications = specifications?.ToArray() ?? Array.Empty<IBusInstanceSpecification>();
+            IBusInstanceSpecification[] busInstanceSpecifications = specifications?.ToArray() ?? [];
 
             IEnumerable<ValidationResult> validationResult = configurator.Validate()
                 .Concat(busInstanceSpecifications.SelectMany(x => x.Validate()));

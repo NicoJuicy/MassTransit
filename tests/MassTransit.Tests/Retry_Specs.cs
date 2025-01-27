@@ -4,7 +4,6 @@
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
     using TestFramework.Messages;
     using Util;
@@ -27,14 +26,14 @@
 
             await fault;
 
-            _attempts.ShouldBe(1);
+            Assert.That(_attempts, Is.EqualTo(1));
         }
 
         int _attempts;
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
-            configurator.UseRetry(x => x.None());
+            configurator.UseMessageRetry(x => x.None());
 
             Handler<PingMessage>(configurator, async context =>
             {
@@ -64,7 +63,7 @@
 
             await fault;
 
-            _attempts.ShouldBe(1);
+            Assert.That(_attempts, Is.EqualTo(1));
         }
 
         int _attempts;
@@ -99,14 +98,14 @@
 
             await fault;
 
-            Consumer.Attempts.ShouldBe(6);
+            Assert.That(Consumer.Attempts, Is.EqualTo(6));
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
             configurator.Consumer(() => new Consumer(), x =>
             {
-                x.UseRetry(r => r.Immediate(5));
+                x.UseMessageRetry(r => r.Immediate(5));
             });
         }
 
@@ -143,14 +142,14 @@
 
             await fault;
 
-            _attempts.ShouldBe(2);
+            Assert.That(_attempts, Is.EqualTo(2));
         }
 
         int _attempts;
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRetry(x => x.Immediate(1));
+            configurator.UseMessageRetry(x => x.Immediate(1));
 
             base.ConfigureInMemoryBus(configurator);
         }
@@ -183,14 +182,14 @@
 
             await fault;
 
-            _attempts.ShouldBe(2);
+            Assert.That(_attempts, Is.EqualTo(2));
         }
 
         int _attempts;
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRetry(x => x.Immediate(1));
+            configurator.UseMessageRetry(x => x.Immediate(1));
 
             base.ConfigureInMemoryBus(configurator);
         }
@@ -234,10 +233,13 @@
 
             await fault;
 
-            _attempts.ShouldBe(4);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_attempts, Is.EqualTo(4));
 
-            _lastCount.ShouldBe(2);
-            _lastAttempt.ShouldBe(3);
+                Assert.That(_lastCount, Is.EqualTo(2));
+                Assert.That(_lastAttempt, Is.EqualTo(3));
+            });
         }
 
         int _attempts;
@@ -246,14 +248,14 @@
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRetry(x => x.Immediate(1));
+            configurator.UseMessageRetry(x => x.Immediate(1));
 
             base.ConfigureInMemoryBus(configurator);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
-            configurator.UseRetry(x => x.Immediate(3));
+            configurator.UseMessageRetry(x => x.Immediate(3));
             Handler<PingMessage>(configurator, async context =>
             {
                 Interlocked.Increment(ref _attempts);
@@ -284,10 +286,13 @@
 
             await fault;
 
-            _attempts.ShouldBe(6);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_attempts, Is.EqualTo(6));
 
-            _lastCount.ShouldBe(4);
-            _lastAttempt.ShouldBe(5);
+                Assert.That(_lastCount, Is.EqualTo(4));
+                Assert.That(_lastAttempt, Is.EqualTo(5));
+            });
         }
 
         static int _attempts;
@@ -327,6 +332,17 @@
             IConsumer<YourMessage>,
             IConsumer<Fault<YourMessage>>
         {
+            public Task Consume(ConsumeContext<Fault<YourMessage>> context)
+            {
+                var faultRetryCount = context.Headers.Get(MessageHeaders.FaultRetryCount, default(int?)) ?? 0;
+
+                TestContext.Out.WriteLine($"Attempt (from fault consumer): {faultRetryCount}");
+
+                TestContext.Out.WriteLine(@"Faulted, won't retry any more.");
+
+                return Task.CompletedTask;
+            }
+
             public Task Consume(ConsumeContext<YourMessage> context)
             {
                 Interlocked.Increment(ref _attempts);
@@ -337,17 +353,6 @@
                 TestContext.Out.WriteLine($"Attempt: {context.GetRetryAttempt()}");
 
                 throw new Exception("Big bad exception");
-            }
-
-            public Task Consume(ConsumeContext<Fault<YourMessage>> context)
-            {
-                var faultRetryCount = context.Headers.Get(MessageHeaders.FaultRetryCount, default(int?)) ?? 0;
-
-                TestContext.Out.WriteLine($"Attempt (from fault consumer): {faultRetryCount}");
-
-                TestContext.Out.WriteLine(@"Faulted, won't retry any more.");
-
-                return Task.CompletedTask;
             }
         }
     }
@@ -370,17 +375,20 @@
 
             await fault;
 
-            Consumer.Attempts.ShouldBe(4);
+            Assert.Multiple(() =>
+            {
+                Assert.That(Consumer.Attempts, Is.EqualTo(4));
 
-            Consumer.LastCount.ShouldBe(2);
-            Consumer.LastAttempt.ShouldBe(3);
+                Assert.That(Consumer.LastCount, Is.EqualTo(2));
+                Assert.That(Consumer.LastAttempt, Is.EqualTo(3));
+            });
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
             configurator.Consumer<Consumer>(cfg =>
             {
-                cfg.UseRetry(x => x.Immediate(3));
+                cfg.UseMessageRetry(x => x.Immediate(3));
             });
         }
 
@@ -424,10 +432,13 @@
 
             await fault;
 
-            _attempts.ShouldBe(1);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_attempts, Is.EqualTo(1));
 
-            _lastAttempt.ShouldBe(0);
-            _lastCount.ShouldBe(0);
+                Assert.That(_lastAttempt, Is.EqualTo(0));
+                Assert.That(_lastCount, Is.EqualTo(0));
+            });
         }
 
         int _attempts;
@@ -436,7 +447,7 @@
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRetry(x =>
+            configurator.UseMessageRetry(x =>
             {
                 x.Ignore<IntentionalTestException>();
                 x.Immediate(1);
@@ -477,9 +488,12 @@
 
             await fault;
 
-            _attempts.ShouldBe(1);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_attempts, Is.EqualTo(1));
 
-            _lastAttempt.ShouldBe(0);
+                Assert.That(_lastAttempt, Is.EqualTo(0));
+            });
         }
 
         int _attempts;
@@ -487,7 +501,7 @@
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRetry(x =>
+            configurator.UseMessageRetry(x =>
             {
                 x.Ignore<IntentionalTestException>();
                 x.Immediate(1);
@@ -523,7 +537,7 @@
 
             await Task.Delay(100);
 
-            _attempts.ShouldBe(2);
+            Assert.That(_attempts, Is.EqualTo(2));
         }
 
         int _attempts;
@@ -531,7 +545,7 @@
 
         protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
         {
-            configurator.UseRetry(x => x.Immediate(1));
+            configurator.UseMessageRetry(x => x.Immediate(1));
 
             base.ConfigureInMemoryBus(configurator);
         }
@@ -572,11 +586,14 @@
 
             var payload = await _payload.Task;
 
-            Assert.That(payload.PostCreateCount, Is.EqualTo(0), "PostCreateCount");
-            Assert.That(payload.RetryCompletedCount, Is.EqualTo(1), "RetryCompletedCount");
-            Assert.That(payload.PreRetryCount, Is.EqualTo(1), "PreRetryCount");
-            Assert.That(payload.PostFaultCount, Is.EqualTo(1), "PostFaultCount");
-            Assert.That(payload.RetryFaultCount, Is.EqualTo(0), "RetryFaultCount");
+            Assert.Multiple(() =>
+            {
+                Assert.That(payload.PostCreateCount, Is.EqualTo(0), "PostCreateCount");
+                Assert.That(payload.RetryCompletedCount, Is.EqualTo(1), "RetryCompletedCount");
+                Assert.That(payload.PreRetryCount, Is.EqualTo(1), "PreRetryCount");
+                Assert.That(payload.PostFaultCount, Is.EqualTo(1), "PostFaultCount");
+                Assert.That(payload.RetryFaultCount, Is.EqualTo(0), "RetryFaultCount");
+            });
         }
 
         int _attempts;
@@ -588,7 +605,7 @@
         {
             _observed = GetTask<RetryContext>();
             _payload = GetTask<RetryPayload>();
-            configurator.UseRetry(x =>
+            configurator.UseMessageRetry(x =>
             {
                 x.Immediate(5);
                 x.ConnectRetryObserver(new RetryObserver(_observed, _payload));
@@ -705,7 +722,7 @@
 
             await Task.Delay(100);
 
-            _attempts.ShouldBe(1);
+            Assert.That(_attempts, Is.EqualTo(1));
         }
 
         int _attempts;
@@ -716,7 +733,7 @@
         {
             _retryObserver = new RetryObserver();
 
-            configurator.UseRetry(x =>
+            configurator.UseMessageRetry(x =>
             {
                 x.Interval(1, TimeSpan.FromMinutes(1));
                 x.ConnectRetryObserver(_retryObserver);

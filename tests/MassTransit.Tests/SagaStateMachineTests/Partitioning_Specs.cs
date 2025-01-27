@@ -28,7 +28,7 @@
             for (var i = 0; i < Limit; i++)
             {
                 Guid? guid = await _repository.ShouldContainSaga(ids[i], TestTimeout);
-                Assert.IsTrue(guid.HasValue);
+                Assert.That(guid.HasValue, Is.True);
             }
 
             timer.Stop();
@@ -36,7 +36,7 @@
             Console.WriteLine("Total time: {0}", timer.Elapsed);
         }
 
-        InMemorySagaRepository<Instance> _repository;
+        ISagaRepository<Instance> _repository;
 
         const int Limit = 100;
 

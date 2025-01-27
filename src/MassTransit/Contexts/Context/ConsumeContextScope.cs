@@ -1,7 +1,7 @@
 ﻿namespace MassTransit.Context
 {
     using System;
-    using System.Reflection;
+    using System.Diagnostics.CodeAnalysis;
     using System.Threading;
     using System.Threading.Tasks;
     using Payloads;
@@ -45,10 +45,11 @@
 
         public override bool HasPayloadType(Type payloadType)
         {
-            return payloadType.GetTypeInfo().IsInstanceOfType(this) || PayloadCache.HasPayloadType(payloadType) || _context.HasPayloadType(payloadType);
+            return payloadType.IsInstanceOfType(this) || PayloadCache.HasPayloadType(payloadType) || _context.HasPayloadType(payloadType);
         }
 
-        public override bool TryGetPayload<T>(out T payload)
+        public override bool TryGetPayload<T>([NotNullWhen(true)] out T payload)
+            where T : class
         {
             if (this is T context)
             {
@@ -125,6 +126,18 @@
         public virtual Task NotifyFaulted(TimeSpan duration, string consumerType, Exception exception)
         {
             return NotifyFaulted(this, duration, consumerType, exception);
+        }
+
+        public void Method1()
+        {
+        }
+
+        public void Method2()
+        {
+        }
+
+        public void Method3()
+        {
         }
     }
 }

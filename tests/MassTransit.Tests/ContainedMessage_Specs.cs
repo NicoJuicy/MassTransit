@@ -2,7 +2,6 @@
 {
     using System.Threading.Tasks;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
 
 
@@ -21,13 +20,15 @@
         {
             ConsumeContext<SecureCommand<ExecuteSql>> context = await _secureCommandHandler;
 
-            context.Message.Credentials.ShouldNotBe(null);
+            Assert.That(context.Message.Credentials, Is.Not.Null);
 
-            context.Message.Credentials.Username.ShouldBe("sa");
+            Assert.That(context.Message.Credentials.Username, Is.EqualTo("sa"));
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<SecureCommand<ExecuteSql>>> _secureCommandHandler;
         Task<ConsumeContext<ExecuteSql>> _commandHandler;
+        #pragma warning restore NUnit1032
 
         [OneTimeSetUp]
         public void Setup()

@@ -4,7 +4,6 @@ namespace MassTransit.DependencyInjection.Registration
     using System.Collections.Generic;
     using Configuration;
     using Internals;
-    using Microsoft.Extensions.DependencyInjection;
     using Transports;
 
 
@@ -13,12 +12,14 @@ namespace MassTransit.DependencyInjection.Registration
         where TActivity : class, IExecuteActivity<TArguments>
         where TArguments : class
     {
-        readonly List<Action<IExecuteActivityConfigurator<TActivity, TArguments>>> _configureActions;
+        readonly List<Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>>> _configureActions;
+        readonly IContainerSelector _selector;
         IExecuteActivityDefinition<TActivity, TArguments> _definition;
 
-        public ExecuteActivityRegistration()
+        public ExecuteActivityRegistration(IContainerSelector selector)
         {
-            _configureActions = new List<Action<IExecuteActivityConfigurator<TActivity, TArguments>>>();
+            _selector = selector;
+            _configureActions = new List<Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>>>();
             IncludeInConfigureEndpoints = !Type.HasAttribute<ExcludeFromConfigureEndpointsAttribute>();
         }
 
@@ -26,15 +27,15 @@ namespace MassTransit.DependencyInjection.Registration
 
         public bool IncludeInConfigureEndpoints { get; set; }
 
-        void IExecuteActivityRegistration.AddConfigureAction<T, TArgs>(Action<IExecuteActivityConfigurator<T, TArgs>> configure)
+        void IExecuteActivityRegistration.AddConfigureAction<T, TArgs>(Action<IRegistrationContext, IExecuteActivityConfigurator<T, TArgs>> configure)
         {
-            if (configure is Action<IExecuteActivityConfigurator<TActivity, TArguments>> action)
+            if (configure is Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>> action)
                 _configureActions.Add(action);
         }
 
-        public void Configure(IReceiveEndpointConfigurator configurator, IServiceProvider configurationServiceProvider)
+        public void Configure(IReceiveEndpointConfigurator configurator, IRegistrationContext context)
         {
-            var executeActivityScopeProvider = configurationServiceProvider.GetRequiredService<IExecuteActivityScopeProvider<TActivity, TArguments>>();
+            var executeActivityScopeProvider = new ExecuteActivityScopeProvider<TActivity, TArguments>(context);
 
             var executeActivityFactory = new ScopeExecuteActivityFactory<TActivity, TArguments>(executeActivityScopeProvider);
 
@@ -42,23 +43,21 @@ namespace MassTransit.DependencyInjection.Registration
 
             configurator.ConfigureConsumeTopology = false;
 
-            GetActivityDefinition(configurationServiceProvider)
-                .Configure(configurator, specification);
+            GetActivityDefinition(context)
+                .Configure(configurator, specification, context);
 
-            foreach (Action<IExecuteActivityConfigurator<TActivity, TArguments>> action in _configureActions)
-                action(specification);
+            foreach (Action<IRegistrationContext, IExecuteActivityConfigurator<TActivity, TArguments>> action in _configureActions)
+                action(context, specification);
 
             LogContext.Info?.Log("Configured endpoint {Endpoint}, Execute Activity: {ActivityType}", configurator.InputAddress.GetEndpointName(),
                 TypeCache<TActivity>.ShortName);
 
             configurator.AddEndpointSpecification(specification);
-
-            IncludeInConfigureEndpoints = false;
         }
 
-        IExecuteActivityDefinition IExecuteActivityRegistration.GetDefinition(IServiceProvider provider)
+        IExecuteActivityDefinition IExecuteActivityRegistration.GetDefinition(IRegistrationContext context)
         {
-            return GetActivityDefinition(provider);
+            return GetActivityDefinition(context);
         }
 
         IExecuteActivityDefinition<TActivity, TArguments> GetActivityDefinition(IServiceProvider provider)
@@ -66,10 +65,11 @@ namespace MassTransit.DependencyInjection.Registration
             if (_definition != null)
                 return _definition;
 
-            _definition = provider.GetService<IExecuteActivityDefinition<TActivity, TArguments>>()
+            _definition = _selector.GetDefinition<IExecuteActivityDefinition<TActivity, TArguments>>(provider)
                 ?? new DefaultExecuteActivityDefinition<TActivity, TArguments>();
 
-            var executeEndpointDefinition = provider.GetService<IEndpointDefinition<IExecuteActivity<TArguments>>>();
+            IEndpointDefinition<IExecuteActivity<TArguments>> executeEndpointDefinition =
+                _selector.GetEndpointDefinition<IExecuteActivity<TArguments>>(provider);
             if (executeEndpointDefinition != null)
                 _definition.ExecuteEndpointDefinition = executeEndpointDefinition;
 

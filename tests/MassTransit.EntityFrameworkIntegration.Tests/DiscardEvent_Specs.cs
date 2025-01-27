@@ -6,6 +6,7 @@
     using System.Data.Entity.ModelConfiguration;
     using System.Linq;
     using System.Threading.Tasks;
+    using MassTransit.Tests;
     using NUnit.Framework;
     using Saga;
     using TestFramework;
@@ -30,14 +31,14 @@
 
             var wasDiscarded = await _discarded.Task;
 
-            Assert.IsTrue(wasDiscarded);
+            Assert.That(wasDiscarded, Is.True);
 
             using (var dbContext = _sagaDbContextFactory.Create())
             {
                 var result = dbContext.Set<SimpleState>().FirstOrDefault(x => x.CorrelationId == sagaId);
                 // THE PROBLEM : the missing instance is not discarded and is persisted to the repository
                 // This test fails
-                Assert.IsNull(result);
+                Assert.That(result, Is.Null);
             }
         }
 
@@ -61,7 +62,7 @@
             using (var dbContext = _sagaDbContextFactory.Create())
             {
                 var result = dbContext.Set<SimpleState>().FirstOrDefault(x => x.CorrelationId == sagaId);
-                Assert.IsNotNull(result);
+                Assert.That(result, Is.Not.Null);
             }
         }
 

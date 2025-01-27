@@ -1,11 +1,11 @@
-﻿#nullable enable
-namespace MassTransit.QuartzIntegration
+﻿namespace MassTransit.QuartzIntegration
 {
     using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Net.Mime;
     using System.Threading.Tasks;
+    using Context;
     using Quartz;
     using Serialization;
 
@@ -28,11 +28,14 @@ namespace MassTransit.QuartzIntegration
             var contentType = new ContentType(jobData.GetString("ContentType")!);
             var destinationAddress = new Uri(jobData.GetString("Destination")!);
             var body = jobData.GetString("Body") ?? string.Empty;
-            var messageType = jobData.GetString("MessageType")?.Split(';')?.ToArray() ?? Array.Empty<string>();
+
+            var supportedMessageTypes = (jobData.TryGetString("MessageType", out var text)
+                ? text?.Split(';').ToArray()
+                : default) ?? [];
 
             try
             {
-                var pipe = new ForwardScheduledMessagePipe(contentType, messageContext, body, destinationAddress);
+                var pipe = new ForwardScheduledMessagePipe(contentType, messageContext, body, destinationAddress, supportedMessageTypes);
 
                 var endpoint = await _bus.GetSendEndpoint(destinationAddress).ConfigureAwait(false);
 
@@ -42,7 +45,7 @@ namespace MassTransit.QuartzIntegration
             }
             catch (Exception ex)
             {
-                LogContext.Error?.Log(ex, "Failed to send scheduled message: {MessageType} {DestinationAddress}", messageType, destinationAddress);
+                LogContext.Error?.Log(ex, "Failed to send scheduled message: {MessageType} {DestinationAddress}", supportedMessageTypes, destinationAddress);
 
                 throw new JobExecutionException(ex, context.RefireCount < 5);
             }
@@ -55,14 +58,17 @@ namespace MassTransit.QuartzIntegration
             readonly string _body;
             readonly ContentType? _contentType;
             readonly Uri? _destinationAddress;
+            readonly string[] _supportedMessageTypes;
             readonly JobDataMessageContext _messageContext;
 
-            public ForwardScheduledMessagePipe(ContentType? contentType, JobDataMessageContext messageContext, string body, Uri? destinationAddress)
+            public ForwardScheduledMessagePipe(ContentType? contentType, JobDataMessageContext messageContext, string body, Uri? destinationAddress,
+                string[] supportedMessageTypes)
             {
                 _contentType = contentType;
                 _messageContext = messageContext;
                 _body = body;
                 _destinationAddress = destinationAddress;
+                _supportedMessageTypes = supportedMessageTypes;
             }
 
             public Task Send(SendContext context)
@@ -84,11 +90,18 @@ namespace MassTransit.QuartzIntegration
                 context.ResponseAddress = _messageContext.ResponseAddress;
                 context.FaultAddress = _messageContext.FaultAddress;
 
+                if (_supportedMessageTypes.Any())
+                    context.SupportedMessageTypes = _supportedMessageTypes;
+
                 if (_messageContext.ExpirationTime.HasValue)
                     context.TimeToLive = _messageContext.ExpirationTime.Value.ToUniversalTime() - DateTime.UtcNow;
 
                 foreach (KeyValuePair<string, object> header in _messageContext.Headers.GetAll())
                     context.Headers.Set(header.Key, header.Value);
+
+                IReadOnlyDictionary<string, object>? transportProperties = _messageContext.TransportProperties;
+                if (transportProperties != null && context is TransportSendContext transportSendContext)
+                    transportSendContext.ReadPropertiesFrom(transportProperties);
 
                 context.Serializer = serializerContext.GetMessageSerializer();
 

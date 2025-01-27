@@ -1,9 +1,8 @@
-#nullable enable
 namespace MassTransit
 {
     using System;
     using System.Threading.Tasks;
-    using Middleware;
+    using Configuration;
 
 
     public static class PipeExtensions
@@ -20,7 +19,7 @@ namespace MassTransit
             return pipe switch
             {
                 null => false,
-                EmptyPipe<T> _ => false,
+                PipeConfigurator<T>.EmptyPipe _ => false,
                 _ => true
             };
         }
@@ -37,7 +36,7 @@ namespace MassTransit
             return pipe switch
             {
                 null => true,
-                EmptyPipe<T> _ => true,
+                PipeConfigurator<T>.EmptyPipe _ => false,
                 _ => false
             };
         }
@@ -77,80 +76,20 @@ namespace MassTransit
         /// <typeparam name="T">The payload type, should be an interface</typeparam>
         /// <param name="context">The pipe context</param>
         /// <param name="setupMethod">The setup method, called once regardless of the thread count</param>
-        /// <param name="payloadFactory">The factory method for the payload context, optional if an interface is specified</param>
         /// <returns></returns>
-        public static async Task OneTimeSetup<T>(this PipeContext context, Func<T, Task> setupMethod, PayloadFactory<T> payloadFactory)
+        public static async Task<OneTimeContext<T>> OneTimeSetup<T>(this PipeContext context, OneTimeSetupCallback setupMethod)
             where T : class
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             if (setupMethod == null)
                 throw new ArgumentNullException(nameof(setupMethod));
-            if (payloadFactory == null)
-                throw new ArgumentNullException(nameof(payloadFactory));
 
-            OneTime<T>? newContext = null;
-            var existingContext = context.GetOrAddPayload<OneTimeSetupContext<T>>(() =>
-            {
-                var payload = payloadFactory();
+            OneTimeContextPayload<T> oneTimeContext = context.GetOrAddPayload(() => new OneTimeContextPayload<T>());
 
-                newContext = new OneTime<T>(payload);
+            await oneTimeContext.RunOneTime(() => new OneTimeSetupMethod(setupMethod)).ConfigureAwait(false);
 
-                return newContext;
-            });
-
-            if (newContext == existingContext)
-            {
-                try
-                {
-                    await setupMethod(newContext.Payload).ConfigureAwait(false);
-
-                    newContext.SetReady();
-                }
-                catch (Exception exception)
-                {
-                    newContext.SetFaulted(exception);
-
-                    throw;
-                }
-            }
-            else
-                await existingContext.Ready.ConfigureAwait(false);
-        }
-
-
-        interface OneTimeSetupContext<TPayload>
-            where TPayload : class
-        {
-            Task<TPayload> Ready { get; }
-        }
-
-
-        class OneTime<TPayload> :
-            OneTimeSetupContext<TPayload>
-            where TPayload : class
-        {
-            readonly TaskCompletionSource<TPayload> _ready;
-
-            public OneTime(TPayload payload)
-            {
-                Payload = payload;
-                _ready = new TaskCompletionSource<TPayload>(TaskCreationOptions.None | TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-
-            public TPayload Payload { get; }
-
-            public Task<TPayload> Ready => _ready.Task;
-
-            public void SetReady()
-            {
-                _ready.TrySetResult(Payload);
-            }
-
-            public void SetFaulted(Exception exception)
-            {
-                _ready.TrySetException(exception);
-            }
+            return oneTimeContext;
         }
     }
 }

@@ -43,22 +43,20 @@ namespace MassTransit.DependencyInjection
             var result = (TResult)typeof(IBusInstanceBuilderCallback<TBus, TResult>)
                 .GetMethod("GetResult")
                 .MakeGenericMethod(busInstanceType)
-                .Invoke(callback, Array.Empty<object>());
+                .Invoke(callback, []);
 
             return result;
         }
 
         Type CreateImplementation(Type interfaceType)
         {
-            var typeInfo = interfaceType.GetTypeInfo();
-
-            if (!typeInfo.IsInterface)
+            if (!interfaceType.IsInterface)
                 throw new ArgumentException("Bus instance types can only be created for interfaces: " + interfaceType.Name, nameof(interfaceType));
 
-            if (typeInfo.IsGenericType)
+            if (interfaceType.IsGenericType)
                 throw new ArgumentException("Bus instance types can not be generic: " + interfaceType.Name, nameof(interfaceType));
 
-            if (!typeInfo.HasInterface<IBus>())
+            if (!interfaceType.HasInterface<IBus>())
                 throw new ArgumentException("Bus instance types must include the IBus interface: " + interfaceType.Name, nameof(interfaceType));
 
             return GetModuleBuilderForType(interfaceType, moduleBuilder => CreateTypeFromInterface(moduleBuilder, interfaceType));
@@ -84,9 +82,9 @@ namespace MassTransit.DependencyInjection
 
                 var typeBuilder = builder.DefineType(typeName,
                     TypeAttributes.Class | TypeAttributes.Public | TypeAttributes.Sealed,
-                    parentType, new[] { interfaceType });
+                    parentType, [interfaceType]);
 
-                Type[] parameterTypes = { typeof(IBusControl) };
+                Type[] parameterTypes = [typeof(IBusControl)];
 
                 var ctorParent = parentType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, parameterTypes, null);
                 var ctorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, parameterTypes);
@@ -98,7 +96,7 @@ namespace MassTransit.DependencyInjection
                 il.Emit(OpCodes.Call, ctorParent);
                 il.Emit(OpCodes.Ret);
 
-                Type[] extraInterfaces = interfaceType.GetTypeInfo().GetAllInterfaces().Except(typeof(IBus).GetTypeInfo().GetAllInterfaces()).ToArray();
+                Type[] extraInterfaces = interfaceType.GetAllInterfaces().Except(typeof(IBus).GetAllInterfaces()).ToArray();
 
                 IEnumerable<PropertyInfo> properties = interfaceType.GetAllProperties();
                 foreach (var property in properties)
@@ -151,7 +149,7 @@ namespace MassTransit.DependencyInjection
             var setMethodBuilder = typeBuilder.DefineMethod("set_" + propertyInfo.Name,
                 PropertyAccessMethodAttributes,
                 null,
-                new[] { propertyInfo.PropertyType });
+                [propertyInfo.PropertyType]);
 
             var il = setMethodBuilder.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);

@@ -17,9 +17,8 @@ namespace MassTransit.EntityFrameworkCoreIntegration.Tests.ReliableMessaging
         public async Task Should_delay_message_scheduling_until_the_outbox_messages_are_delivered()
         {
             await using var provider = new ServiceCollection()
-                .AddQuartz(q =>
+                .AddQuartz(_ =>
                 {
-                    q.UseMicrosoftDependencyInjectionJobFactory();
                 })
                 .AddBusOutboxServices()
                 .AddMassTransitTestHarness(x =>
@@ -56,9 +55,12 @@ namespace MassTransit.EntityFrameworkCoreIntegration.Tests.ReliableMessaging
             {
                 await harness.Bus.Publish<FirstMessage>(new { });
 
-                Assert.That(await harness.GetConsumerHarness<FirstMessageConsumer>().Consumed.Any<FirstMessage>(), Is.True);
+                await Assert.MultipleAsync(async () =>
+                {
+                    Assert.That(await harness.GetConsumerHarness<FirstMessageConsumer>().Consumed.Any<FirstMessage>(), Is.True);
 
-                Assert.That(await harness.Consumed.Any<ScheduleMessage>(), Is.True);
+                    Assert.That(await harness.Consumed.Any<ScheduleMessage>(), Is.True);
+                });
 
                 await adjustment.AdvanceTime(TimeSpan.FromSeconds(10));
 
@@ -84,19 +86,12 @@ namespace MassTransit.EntityFrameworkCoreIntegration.Tests.ReliableMessaging
         public class FirstMessageConsumerDefinition :
             ConsumerDefinition<FirstMessageConsumer>
         {
-            readonly IServiceProvider _provider;
-
-            public FirstMessageConsumerDefinition(IServiceProvider provider)
-            {
-                _provider = provider;
-            }
-
             protected override void ConfigureConsumer(IReceiveEndpointConfigurator endpointConfigurator,
-                IConsumerConfigurator<FirstMessageConsumer> consumerConfigurator)
+                IConsumerConfigurator<FirstMessageConsumer> consumerConfigurator, IRegistrationContext context)
             {
                 endpointConfigurator.UseMessageRetry(r => r.Intervals(100, 100, 100));
 
-                endpointConfigurator.UseEntityFrameworkOutbox<ReliableDbContext>(_provider);
+                endpointConfigurator.UseEntityFrameworkOutbox<ReliableDbContext>(context);
             }
         }
 

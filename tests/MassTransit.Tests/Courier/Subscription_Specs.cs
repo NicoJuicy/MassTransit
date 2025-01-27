@@ -6,7 +6,9 @@
     using MassTransit.Courier.Contracts;
     using MassTransit.Serialization;
     using MassTransit.Testing;
+    using Microsoft.Extensions.DependencyInjection;
     using NUnit.Framework;
+    using Scenario;
     using TestFramework;
     using TestFramework.Courier;
 
@@ -42,7 +44,7 @@
 
             var loaded = TestExtensionsForJson.GetRoutingSlip(jsonString);
 
-            Assert.AreEqual(RoutingSlipEvents.Completed | RoutingSlipEvents.Faulted, loaded.Subscriptions[0].Events);
+            Assert.That(loaded.Subscriptions[0].Events, Is.EqualTo(RoutingSlipEvents.Completed | RoutingSlipEvents.Faulted));
         }
     }
 
@@ -56,7 +58,7 @@
         {
             ConsumeContext<RoutingSlipActivityCompleted> context = await _activityCompleted;
 
-            Assert.IsFalse(context.Message.Data.ContainsKey("OriginalValue"));
+            Assert.That(context.Message.Data.ContainsKey("OriginalValue"), Is.False);
         }
 
         [Test]
@@ -64,7 +66,7 @@
         {
             ConsumeContext<RoutingSlipActivityCompleted> context = await _activityCompleted;
 
-            Assert.IsFalse(context.Message.Variables.ContainsKey("Variable"));
+            Assert.That(context.Message.Variables.ContainsKey("Variable"), Is.False);
         }
 
         [Test]
@@ -72,7 +74,7 @@
         {
             ConsumeContext<RoutingSlipActivityCompleted> context = await _activityCompleted;
 
-            Assert.AreEqual(_trackingNumber, context.Message.TrackingNumber);
+            Assert.That(context.Message.TrackingNumber, Is.EqualTo(_trackingNumber));
         }
 
         [Test]
@@ -89,17 +91,18 @@
 
             var loaded = TestExtensionsForJson.GetRoutingSlip(jsonString);
 
-            Assert.AreEqual(RoutingSlipEvents.Completed | RoutingSlipEvents.Faulted, loaded.Subscriptions[0].Events);
+            Assert.That(loaded.Subscriptions[0].Events, Is.EqualTo(RoutingSlipEvents.Completed | RoutingSlipEvents.Faulted));
         }
 
-        Task<ConsumeContext<RoutingSlipCompleted>> _completed;
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<RoutingSlipActivityCompleted>> _activityCompleted;
+        #pragma warning restore NUnit1032
         Guid _trackingNumber;
 
         [OneTimeSetUp]
         public async Task Should_publish_the_completed_event()
         {
-            _completed = SubscribeHandler<RoutingSlipCompleted>();
+            _ = SubscribeHandler<RoutingSlipCompleted>();
             _activityCompleted = SubscribeHandler<RoutingSlipActivityCompleted>();
 
             _trackingNumber = NewId.NextGuid();
@@ -117,6 +120,65 @@
         protected override void SetupActivities(BusTestHarness testHarness)
         {
             AddActivityContext<TestActivity, TestArguments, TestLog>(() => new TestActivity());
+        }
+    }
+
+
+    [TestFixture(typeof(Json))]
+    [TestFixture(typeof(RawJson))]
+    [TestFixture(typeof(NewtonsoftJson))]
+    [TestFixture(typeof(NewtonsoftRawJson))]
+    public class Adding_a_custom_routing_slip_event_subscription<T>
+        where T : new()
+    {
+        [Test]
+        public async Task Should_be_sent()
+        {
+            await using var provider = new ServiceCollection()
+                .AddMassTransitTestHarness(x =>
+                {
+                    x.AddHandler<RegistrationCompleted>();
+                    x.AddActivity<TestActivity, TestArguments, TestLog>();
+
+                    x.UsingInMemory(((context, cfg) =>
+                    {
+                        _configuration?.ConfigureBus(context, cfg);
+
+                        cfg.ConfigureEndpoints(context);
+                    }));
+                })
+                .BuildServiceProvider(true);
+
+            var harness = await provider.StartTestHarness();
+
+            var trackingNumber = NewId.NextGuid();
+            var builder = new RoutingSlipBuilder(trackingNumber);
+            await builder.AddSubscription(harness.GetHandlerAddress<RegistrationCompleted>(), RoutingSlipEvents.Completed, RoutingSlipEventContents.All,
+                x => x.Send<RegistrationCompleted>(new { Value = "Secret Value" }));
+
+            builder.AddActivity("TestActivity", harness.GetExecuteActivityAddress<TestActivity, TestArguments>(), new { Value = "Hello" });
+
+            await harness.Bus.Execute(builder.Build());
+
+            IReceivedMessage<RegistrationCompleted> completed = await harness.Consumed
+                .SelectAsync<RegistrationCompleted>(x => x.Context.Message.TrackingNumber == trackingNumber).FirstOrDefault();
+            Assert.That(completed, Is.Not.Null);
+
+            Assert.That(completed.Context.Message.Value, Is.EqualTo("Secret Value"));
+        }
+
+        readonly ITestBusConfiguration _configuration;
+
+        public Adding_a_custom_routing_slip_event_subscription()
+        {
+            _configuration = new T() as ITestBusConfiguration;
+        }
+
+
+        public interface RegistrationCompleted :
+            RoutingSlipCompleted
+        {
+            string Value { get; }
         }
     }
 }

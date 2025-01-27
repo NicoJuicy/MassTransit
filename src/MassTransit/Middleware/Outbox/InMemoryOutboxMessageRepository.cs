@@ -4,6 +4,7 @@ namespace MassTransit.Middleware.Outbox
     using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
+    using Internals;
 
 
     public class InMemoryOutboxMessageRepository
@@ -26,16 +27,11 @@ namespace MassTransit.Middleware.Outbox
         {
             var key = new InMemoryInboxMessageKey(messageId, consumerId);
 
-            if (!_dictionary.TryGetValue(key, out var existing))
+            var existing = _dictionary.GetOrAdd(key, _ => new InMemoryInboxMessage(messageId, consumerId)
             {
-                existing = new InMemoryInboxMessage(messageId, consumerId)
-                {
-                    Received = DateTime.UtcNow,
-                    ReceiveCount = 0
-                };
-
-                _dictionary.Add(key, existing);
-            }
+                Received = DateTime.UtcNow,
+                ReceiveCount = 0
+            });
 
             await existing.MarkInUse(cancellationToken).ConfigureAwait(false);
 

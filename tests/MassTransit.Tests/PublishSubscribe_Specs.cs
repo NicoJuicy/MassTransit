@@ -3,7 +3,6 @@ namespace MassTransit.Tests
     using System;
     using System.Threading.Tasks;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
     using TestFramework.Messages;
 
@@ -21,7 +20,9 @@ namespace MassTransit.Tests
             await _received;
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
@@ -43,7 +44,9 @@ namespace MassTransit.Tests
             await _received;
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
@@ -64,11 +67,16 @@ namespace MassTransit.Tests
 
             ConsumeContext<PingMessage> context = await _received;
 
-            context.RequestId.HasValue.ShouldBe(true);
-            context.RequestId.Value.ShouldBe(_requestId);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.RequestId.HasValue, Is.True);
+                Assert.That(context.RequestId.Value, Is.EqualTo(_requestId));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
         readonly Guid _requestId = NewId.NextGuid();
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -90,11 +98,16 @@ namespace MassTransit.Tests
 
             ConsumeContext<PingMessage> context = await _received;
 
-            context.RequestId.HasValue.ShouldBe(true);
-            context.RequestId.Value.ShouldBe(_requestId);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.RequestId.HasValue, Is.True);
+                Assert.That(context.RequestId.Value, Is.EqualTo(_requestId));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
         readonly Guid _requestId = NewId.NextGuid();
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -116,10 +129,12 @@ namespace MassTransit.Tests
 
             ConsumeContext<PingMessage> consumeContext = await _received;
 
-            consumeContext.RequestId.ShouldBe(_requestId);
+            Assert.That(consumeContext.RequestId, Is.EqualTo(_requestId));
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
         readonly Guid _requestId = NewId.NextGuid();
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -141,7 +156,9 @@ namespace MassTransit.Tests
             ConsumeContext<PingMessage> context = await _received;
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
@@ -161,11 +178,16 @@ namespace MassTransit.Tests
 
             ConsumeContext<PingMessage> context = await _received;
 
-            context.RequestId.HasValue.ShouldBe(true);
-            context.RequestId.ShouldBe(_requestId);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.RequestId.HasValue, Is.True);
+                Assert.That(context.RequestId, Is.EqualTo(_requestId));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _received;
+        #pragma warning restore NUnit1032
         readonly Guid _requestId = NewId.NextGuid();
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)

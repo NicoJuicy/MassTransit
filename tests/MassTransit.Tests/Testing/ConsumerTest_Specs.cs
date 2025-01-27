@@ -4,7 +4,6 @@ namespace MassTransit.Tests.Testing
     using System.Threading.Tasks;
     using MassTransit.Testing;
     using NUnit.Framework;
-    using Shouldly;
 
 
     [TestFixture]
@@ -13,25 +12,25 @@ namespace MassTransit.Tests.Testing
         [Test]
         public void Should_have_called_the_consumer_method()
         {
-            _consumer.Consumed.Select<A>().Any().ShouldBe(true);
+            Assert.That(_consumer.Consumed.Select<A>().Any(), Is.True);
         }
 
         [Test]
         public void Should_have_sent_the_response_from_the_consumer()
         {
-            _harness.Published.Select<B>().Any().ShouldBe(true);
+            Assert.That(_harness.Published.Select<B>().Any(), Is.True);
         }
 
         [Test]
         public void Should_receive_the_message_type_a()
         {
-            _harness.Consumed.Select<A>().Any().ShouldBe(true);
+            Assert.That(_harness.Consumed.Select<A>().Any(), Is.True);
         }
 
         [Test]
         public void Should_send_the_initial_message_to_the_consumer()
         {
-            _harness.Sent.Select<A>().Any().ShouldBe(true);
+            Assert.That(_harness.Sent.Select<A>().Any(), Is.True);
         }
 
         InMemoryTestHarness _harness;
@@ -52,6 +51,7 @@ namespace MassTransit.Tests.Testing
         public async Task Teardown()
         {
             await _harness.Stop();
+            _harness.Dispose();
         }
 
 
@@ -121,6 +121,7 @@ namespace MassTransit.Tests.Testing
         public async Task Teardown()
         {
             await _harness.Stop();
+            _harness.Dispose();
         }
 
 
@@ -152,27 +153,33 @@ namespace MassTransit.Tests.Testing
         [Test]
         public void Should_have_called_the_consumer_method()
         {
-            _consumer.Consumed.Select<IA>().Any().ShouldBe(true);
+            Assert.That(_consumer.Consumed.Select<IA>().Any(), Is.True);
         }
 
         [Test]
         public void Should_have_sent_the_response_from_the_consumer()
         {
-            _harness.Published.Select<B>().Any().ShouldBe(true);
-            _harness.Published.Select<IB>().Any().ShouldBe(true);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_harness.Published.Select<B>().Any(), Is.True);
+                Assert.That(_harness.Published.Select<IB>().Any(), Is.True);
+            });
         }
 
         [Test]
         public void Should_receive_the_message_type_a()
         {
-            _harness.Consumed.Select<IA>().Any().ShouldBe(true);
+            Assert.That(_harness.Consumed.Select<IA>().Any(), Is.True);
         }
 
         [Test]
         public void Should_send_the_initial_message_to_the_consumer()
         {
-            _harness.Sent.Select<A>().Any().ShouldBe(true);
-            _harness.Sent.Select<IA>().Any().ShouldBe(true);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_harness.Sent.Select<A>().Any(), Is.True);
+                Assert.That(_harness.Sent.Select<IA>().Any(), Is.True);
+            });
         }
 
         InMemoryTestHarness _harness;
@@ -193,6 +200,7 @@ namespace MassTransit.Tests.Testing
         public async Task Teardown()
         {
             await _harness.Stop();
+            _harness.Dispose();
         }
 
 
@@ -249,30 +257,31 @@ namespace MassTransit.Tests.Testing
         public async Task Teardown()
         {
             await _harness.Stop();
+            _harness.Dispose();
         }
 
         [Test]
         public void Should_send_the_initial_message_to_the_consumer()
         {
-            _harness.Sent.Select<A>().Any().ShouldBe(true);
+            Assert.That(_harness.Sent.Select<A>().Any(), Is.True);
         }
 
         [Test]
         public void Should_have_sent_the_response_from_the_consumer()
         {
-            _harness.Sent.Select<B>().Any().ShouldBe(true);
+            Assert.That(_harness.Sent.Select<B>().Any(), Is.True);
         }
 
         [Test]
         public void Should_receive_the_message_type_a()
         {
-            _harness.Consumed.Select<A>().Any().ShouldBe(true);
+            Assert.That(_harness.Consumed.Select<A>().Any(), Is.True);
         }
 
         [Test]
         public void Should_have_called_the_consumer_method()
         {
-            _consumer.Consumed.Select<A>().Any().ShouldBe(true);
+            Assert.That(_consumer.Consumed.Select<A>().Any(), Is.True);
         }
 
 

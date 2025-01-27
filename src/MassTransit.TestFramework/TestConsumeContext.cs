@@ -20,7 +20,7 @@
 
         static InMemoryReceiveEndpointContext Build()
         {
-            var topologyConfiguration = new InMemoryTopologyConfiguration(InMemoryBus.MessageTopology);
+            var topologyConfiguration = new InMemoryTopologyConfiguration(InMemoryBus.CreateMessageTopology());
             IInMemoryBusConfiguration busConfiguration = new InMemoryBusConfiguration(topologyConfiguration, null);
 
             var receiveEndpointConfiguration = busConfiguration.HostConfiguration.CreateReceiveEndpointConfiguration("input-queue");
@@ -161,7 +161,7 @@
 
         public bool HasMessageType(Type messageType)
         {
-            return messageType.GetTypeInfo().IsAssignableFrom(typeof(TMessage));
+            return messageType.IsAssignableFrom(typeof(TMessage));
         }
 
         public bool TryGetMessage<T>(out ConsumeContext<T> consumeContext)
@@ -284,7 +284,7 @@
         {
             HeaderProvider = new DictionaryHeaderProvider(new Dictionary<string, object>());
 
-            Body = new BytesMessageBody(Array.Empty<byte>());
+            Body = new BytesMessageBody([]);
         }
 
         protected override IHeaderProvider HeaderProvider { get; }

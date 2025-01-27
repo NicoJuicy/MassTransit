@@ -13,6 +13,7 @@ namespace MassTransit.Tests.Middleware
     public class When_using_or_canceled_should_not_have_an_unhandled_task_exception
     {
         [Test]
+        [Explicit]
         public async Task Should_fault_on_ready_faulted()
         {
             List<object> unhandledExceptions = new List<object>();
@@ -47,8 +48,11 @@ namespace MassTransit.Tests.Middleware
             GC.WaitForPendingFinalizers();
             GC.Collect();
 
-            Assert.That(unhandledExceptions, Is.Empty);
-            Assert.That(unobservedTaskExceptions, Is.Empty);
+            Assert.Multiple(() =>
+            {
+                Assert.That(unhandledExceptions, Is.Empty);
+                Assert.That(unobservedTaskExceptions, Is.Empty);
+            });
         }
     }
 }

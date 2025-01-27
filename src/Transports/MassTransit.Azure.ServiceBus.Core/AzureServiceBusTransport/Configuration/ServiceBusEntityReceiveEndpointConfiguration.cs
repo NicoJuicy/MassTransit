@@ -80,6 +80,11 @@
             set => _configurator.RequiresSession = value;
         }
 
+        public int MaxConcurrentSessions
+        {
+            set => _configurator.MaxConcurrentSessions = value;
+        }
+
         public int MaxConcurrentCallsPerSession
         {
             set => _configurator.MaxConcurrentCallsPerSession = value;
@@ -95,7 +100,7 @@
             set => _settings.SessionIdleTimeout = value;
         }
 
-        public TimeSpan SessionIdleTimeout
+        public TimeSpan? SessionIdleTimeout
         {
             set => _settings.SessionIdleTimeout = value;
         }
@@ -127,11 +132,10 @@
                 ClientPipeConfigurator.UseFilter(new TransportReadyFilter<ClientContext>(receiveEndpointContext));
             else
             {
-                var messageReceiver = new ServiceBusMessageReceiver(receiveEndpointContext);
-
+                ClientPipeConfigurator.UseFilter(new ReceiveEndpointDependencyFilter<ClientContext>(receiveEndpointContext));
                 ClientPipeConfigurator.UseFilter(_settings.RequiresSession
-                    ? new MessageSessionReceiverFilter(messageReceiver, receiveEndpointContext)
-                    : new MessageReceiverFilter(messageReceiver, receiveEndpointContext));
+                    ? new MessageSessionReceiverFilter(receiveEndpointContext)
+                    : new MessageReceiverFilter(receiveEndpointContext));
             }
 
             IPipe<ClientContext> clientPipe = ClientPipeConfigurator.Build();

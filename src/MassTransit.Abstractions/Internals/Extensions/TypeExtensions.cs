@@ -23,9 +23,7 @@ namespace MassTransit.Internals
 
         public static IEnumerable<PropertyInfo> GetAllProperties(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-
-            return GetAllProperties(typeInfo);
+            return GetAllProperties(type.GetTypeInfo());
         }
 
         public static IEnumerable<PropertyInfo> GetAllProperties(this TypeInfo typeInfo)
@@ -36,7 +34,7 @@ namespace MassTransit.Internals
                     yield return prop;
             }
 
-            var specialGetPropertyNames = typeInfo.DeclaredMethods
+            IEnumerable<string>? specialGetPropertyNames = typeInfo.DeclaredMethods
                 .Where(x => x.IsSpecialName && x.Name.StartsWith("get_") && !x.IsStatic)
                 .Select(x => x.Name.Substring("get_".Length)).Distinct();
 
@@ -47,7 +45,9 @@ namespace MassTransit.Internals
             if (typeInfo.IsInterface)
             {
                 IEnumerable<PropertyInfo> sourceProperties = properties
-                    .Concat(typeInfo.ImplementedInterfaces.SelectMany(x => x.GetTypeInfo().DeclaredProperties));
+                    .Concat(typeInfo.ImplementedInterfaces.SelectMany(x => x.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance |
+                        BindingFlags.Static | BindingFlags.Public |
+                        BindingFlags.NonPublic)));
 
                 foreach (var prop in sourceProperties)
                     yield return prop;
@@ -61,17 +61,10 @@ namespace MassTransit.Internals
 
         public static IEnumerable<Type> GetAllInterfaces(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
+            if (type.IsInterface)
+                yield return type;
 
-            return GetAllInterfaces(typeInfo);
-        }
-
-        public static IEnumerable<Type> GetAllInterfaces(this TypeInfo typeInfo)
-        {
-            if (typeInfo.IsInterface)
-                yield return typeInfo;
-
-            foreach (var interfaceType in typeInfo.GetInterfaces())
+            foreach (var interfaceType in type.GetInterfaces())
                 yield return interfaceType;
         }
 
@@ -79,29 +72,28 @@ namespace MassTransit.Internals
         {
             var info = type.GetTypeInfo();
 
-            if (info.BaseType != null)
+            if (type.BaseType != null)
             {
-                foreach (var prop in GetAllStaticProperties(info.BaseType))
+                foreach (var prop in GetAllStaticProperties(type.BaseType))
                     yield return prop;
             }
 
-            IEnumerable<PropertyInfo> props = info.DeclaredMethods
+            IEnumerable<PropertyInfo?> props = info.DeclaredMethods
                 .Where(x => x.IsSpecialName && x.Name.StartsWith("get_") && x.IsStatic)
-                .Select(x => info.GetDeclaredProperty(x.Name.Substring("get_".Length)))
-                .Cast<PropertyInfo>();
+                .Select(x => info.GetDeclaredProperty(x.Name.Substring("get_".Length)));
 
             foreach (var propertyInfo in props)
-                yield return propertyInfo;
+                if (propertyInfo != null)
+                    yield return propertyInfo;
         }
 
-        public static IEnumerable<PropertyInfo> GetStaticProperties(this Type type)
+        public static IEnumerable<PropertyInfo?> GetStaticProperties(this Type type)
         {
             var info = type.GetTypeInfo();
 
             return info.DeclaredMethods
                 .Where(x => x.IsSpecialName && x.Name.StartsWith("get_") && x.IsStatic)
-                .Select(x => info.GetDeclaredProperty(x.Name.Substring("get_".Length)))
-                .Cast<PropertyInfo>();
+                .Select(x => info.GetDeclaredProperty(x.Name.Substring("get_".Length)));
         }
 
         /// <summary>
@@ -111,17 +103,15 @@ namespace MassTransit.Internals
         /// <returns>True if the type can be constructed, otherwise false.</returns>
         public static bool IsConcrete(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-            return !typeInfo.IsAbstract && !typeInfo.IsInterface;
+            return type is { IsAbstract: false, IsInterface: false };
         }
 
         public static bool IsInterfaceOrConcreteClass(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-            if (typeInfo.IsInterface)
+            if (type.IsInterface)
                 return true;
 
-            return typeInfo.IsClass && !typeInfo.IsAbstract;
+            return type is { IsClass: true, IsAbstract: false };
         }
 
         /// <summary>
@@ -135,7 +125,7 @@ namespace MassTransit.Internals
         /// </returns>
         public static bool IsConcreteAndAssignableTo(this Type type, Type assignableType)
         {
-            return IsConcrete(type) && assignableType.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+            return IsConcrete(type) && assignableType.IsAssignableFrom(type);
         }
 
         /// <summary>
@@ -149,7 +139,7 @@ namespace MassTransit.Internals
         /// </returns>
         public static bool IsConcreteAndAssignableTo<T>(this Type type)
         {
-            return IsConcrete(type) && typeof(T).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+            return IsConcrete(type) && typeof(T).IsAssignableFrom(type);
         }
 
         /// <summary>
@@ -160,8 +150,7 @@ namespace MassTransit.Internals
         /// <returns>True if the type can be null</returns>
         public static bool IsNullable(this Type type, out Type? underlyingType)
         {
-            var typeInfo = type.GetTypeInfo();
-            var isNullable = typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof(Nullable<>);
+            var isNullable = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
 
             underlyingType = isNullable ? Nullable.GetUnderlyingType(type) : null;
             return isNullable;
@@ -174,17 +163,7 @@ namespace MassTransit.Internals
         /// <returns>True if the type is an open generic</returns>
         public static bool IsOpenGeneric(this Type type)
         {
-            return type.GetTypeInfo().IsOpenGeneric();
-        }
-
-        /// <summary>
-        /// Determines if the TypeInfo is an open generic with at least one unspecified generic argument
-        /// </summary>
-        /// <param name="typeInfo">The TypeInfo</param>
-        /// <returns>True if the TypeInfo is an open generic</returns>
-        public static bool IsOpenGeneric(this TypeInfo typeInfo)
-        {
-            return typeInfo.IsGenericTypeDefinition || typeInfo.ContainsGenericParameters;
+            return type.IsGenericTypeDefinition || type.ContainsGenericParameters;
         }
 
         /// <summary>
@@ -194,11 +173,9 @@ namespace MassTransit.Internals
         /// <returns>True if the type can be null</returns>
         public static bool CanBeNull(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-
-            return !typeInfo.IsValueType
+            return !type.IsValueType
                 || type == typeof(string)
-                || typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof(Nullable<>);
+                || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>));
         }
 
         /// <summary>
@@ -233,27 +210,17 @@ namespace MassTransit.Internals
         /// <returns></returns>
         public static bool IsAnonymousType(this Type type)
         {
-            return type.GetTypeInfo().IsAnonymousType();
-        }
-
-        /// <summary>
-        /// Returns true if the TypeInfo is an anonymous type
-        /// </summary>
-        /// <param name="typeInfo"></param>
-        /// <returns></returns>
-        public static bool IsAnonymousType(this TypeInfo typeInfo)
-        {
-            return typeInfo.FullName != null && typeInfo.HasAttribute<CompilerGeneratedAttribute>() && typeInfo.FullName.Contains("AnonymousType");
+            return type.FullName != null && type.HasAttribute<CompilerGeneratedAttribute>() && type.FullName.Contains("AnonymousType");
         }
 
         /// <summary>
         /// Returns true if the type is an FSharp type (maybe?)
         /// </summary>
-        /// <param name="typeInfo"></param>
+        /// <param name="type"></param>
         /// <returns></returns>
-        public static bool IsFSharpType(this TypeInfo typeInfo)
+        public static bool IsFSharpType(this Type type)
         {
-            IEnumerable<Attribute> attributes = typeInfo.GetCustomAttributes();
+            IEnumerable<Attribute> attributes = type.GetCustomAttributes();
 
             return attributes.Any(attribute => attribute.GetType().FullName == "Microsoft.FSharp.Core.CompilationMappingAttribute");
         }
@@ -277,7 +244,7 @@ namespace MassTransit.Internals
         /// <returns></returns>
         public static bool IsValueTypeOrObject(this Type valueType)
         {
-            if (valueType.GetTypeInfo().IsValueType
+            if (valueType.IsValueType
                 || valueType == typeof(string)
                 || valueType == typeof(Uri)
                 || valueType == typeof(Version)

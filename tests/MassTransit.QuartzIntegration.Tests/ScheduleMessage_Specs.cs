@@ -24,13 +24,125 @@
             await _second;
 
             if (_secondActivityId != null && _firstActivityId != null)
-                Assert.That(_secondActivityId.StartsWith(_firstActivityId), Is.True);
+                Assert.That(_secondActivityId, Does.StartWith(_firstActivityId));
         }
 
         Task<ConsumeContext<SecondMessage>> _second;
         Task<ConsumeContext<FirstMessage>> _first;
         string _firstActivityId;
         string _secondActivityId;
+
+        protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
+        {
+            _first = Handler<FirstMessage>(configurator, async context =>
+            {
+                _firstActivityId = Activity.Current?.Id;
+                await context.ScheduleSend(TimeSpan.FromSeconds(10), new SecondMessage());
+            });
+
+            _second = Handler<SecondMessage>(configurator, async context =>
+            {
+                _secondActivityId = Activity.Current?.Id;
+            });
+        }
+
+
+        public class FirstMessage
+        {
+        }
+
+
+        public class SecondMessage
+        {
+        }
+    }
+
+
+    [TestFixture]
+    public class ScheduleMessageUsingRawJson_Specs :
+        QuartzInMemoryTestFixture
+    {
+        [Test]
+        public async Task Should_get_both_messages()
+        {
+            await Scheduler.ScheduleSend(InputQueueAddress, DateTime.Now, new FirstMessage());
+
+            await _first;
+
+            await AdvanceTime(TimeSpan.FromSeconds(10));
+
+            await _second;
+
+            if (_secondActivityId != null && _firstActivityId != null)
+                Assert.That(_secondActivityId, Does.StartWith(_firstActivityId));
+        }
+
+        Task<ConsumeContext<SecondMessage>> _second;
+        Task<ConsumeContext<FirstMessage>> _first;
+        string _firstActivityId;
+        string _secondActivityId;
+
+        protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
+        {
+            configurator.UseRawJsonSerializer();
+            base.ConfigureInMemoryBus(configurator);
+        }
+
+        protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
+        {
+            _first = Handler<FirstMessage>(configurator, async context =>
+            {
+                _firstActivityId = Activity.Current?.Id;
+                await context.ScheduleSend(TimeSpan.FromSeconds(10), new SecondMessage());
+            });
+
+            _second = Handler<SecondMessage>(configurator, async context =>
+            {
+                _secondActivityId = Activity.Current?.Id;
+            });
+        }
+
+
+        public class FirstMessage
+        {
+        }
+
+
+        public class SecondMessage
+        {
+        }
+    }
+
+
+    [TestFixture]
+    public class ScheduleMessageUsingNewtonsoftRawJson_Specs :
+        QuartzInMemoryTestFixture
+    {
+        [Test]
+        public async Task Should_get_both_messages()
+        {
+            await Scheduler.ScheduleSend(InputQueueAddress, DateTime.Now, new FirstMessage());
+
+            await _first;
+
+            await AdvanceTime(TimeSpan.FromSeconds(10));
+
+            await _second;
+
+            if (_secondActivityId != null && _firstActivityId != null)
+                Assert.That(_secondActivityId, Does.StartWith(_firstActivityId));
+        }
+
+        Task<ConsumeContext<SecondMessage>> _second;
+        Task<ConsumeContext<FirstMessage>> _first;
+        string _firstActivityId;
+        string _secondActivityId;
+
+        protected override void ConfigureInMemoryBus(IInMemoryBusFactoryConfigurator configurator)
+        {
+            configurator.UseNewtonsoftRawJsonSerializer(RawSerializerOptions.CopyHeaders | RawSerializerOptions.AddTransportHeaders);
+            base.ConfigureInMemoryBus(configurator);
+        }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
@@ -74,7 +186,7 @@
             await _second;
 
             if (_secondActivityId != null && _firstActivityId != null)
-                Assert.That(_secondActivityId.StartsWith(_firstActivityId), Is.True);
+                Assert.That(_secondActivityId, Does.StartWith(_firstActivityId));
         }
 
         Task<ConsumeContext<SecondMessage>> _second;
@@ -131,7 +243,7 @@
             await _second;
 
             if (_secondActivityId != null && _firstActivityId != null)
-                Assert.That(_secondActivityId.StartsWith(_firstActivityId), Is.True);
+                Assert.That(_secondActivityId, Does.StartWith(_firstActivityId));
         }
 
         Task<ConsumeContext<SecondMessage>> _second;
@@ -192,8 +304,11 @@
 
             ConsumeContext<SecondMessage> second = await _second;
 
-            Assert.That(second.ExpirationTime.HasValue, Is.True);
-            Assert.That(second.ExpirationTime.Value, Is.GreaterThan(DateTime.UtcNow + TimeSpan.FromSeconds(20)));
+            Assert.Multiple(() =>
+            {
+                Assert.That(second.ExpirationTime.HasValue, Is.True);
+                Assert.That(second.ExpirationTime.Value, Is.GreaterThan(DateTime.UtcNow + TimeSpan.FromSeconds(20)));
+            });
         }
 
         Task<ConsumeContext<SecondMessage>> _second;

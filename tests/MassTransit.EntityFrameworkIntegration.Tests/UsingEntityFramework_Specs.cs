@@ -7,6 +7,7 @@
     using System.Data.Entity.ModelConfiguration;
     using System.Linq;
     using System.Threading.Tasks;
+    using MassTransit.Tests;
     using NUnit.Framework;
     using Saga;
     using TestFramework;
@@ -39,7 +40,7 @@
             for (var i = 0; i < 200; i++)
             {
                 Guid? sagaId = await _repository.Value.ShouldContainSaga(sagaIds[i], TestTimeout);
-                Assert.IsTrue(sagaId.HasValue);
+                Assert.That(sagaId.HasValue, Is.True);
             }
         }
 
@@ -51,12 +52,12 @@
             await InputQueueSendEndpoint.Send(new GirlfriendYelling { CorrelationId = correlationId });
 
             Guid? sagaId = await _repository.Value.ShouldContainSaga(correlationId, TestTimeout);
-            Assert.IsTrue(sagaId.HasValue);
+            Assert.That(sagaId.HasValue, Is.True);
 
             await InputQueueSendEndpoint.Send(new SodOff { CorrelationId = correlationId });
 
             sagaId = await _repository.Value.ShouldNotContainSaga(correlationId, TestTimeout);
-            Assert.IsFalse(sagaId.HasValue);
+            Assert.That(sagaId.HasValue, Is.False);
         }
 
         [Test]
@@ -68,17 +69,17 @@
 
             Guid? sagaId = await _repository.Value.ShouldContainSaga(correlationId, TestTimeout);
 
-            Assert.IsTrue(sagaId.HasValue);
+            Assert.That(sagaId.HasValue, Is.True);
 
             await InputQueueSendEndpoint.Send(new GotHitByACar { CorrelationId = correlationId });
 
             sagaId = await _repository.Value.ShouldContainSagaInState(correlationId, _machine, _machine.Dead, TestTimeout);
 
-            Assert.IsTrue(sagaId.HasValue);
+            Assert.That(sagaId.HasValue, Is.True);
 
             var instance = await GetSaga(correlationId);
 
-            Assert.IsTrue(instance.Screwed);
+            Assert.That(instance.Screwed, Is.True);
         }
 
         SuperShopper _machine;
@@ -89,7 +90,7 @@
         {
             _machine = new SuperShopper();
 
-            configurator.UseRetry(x =>
+            configurator.UseMessageRetry(x =>
             {
                 x.Handle<DbUpdateException>();
                 x.Immediate(5);

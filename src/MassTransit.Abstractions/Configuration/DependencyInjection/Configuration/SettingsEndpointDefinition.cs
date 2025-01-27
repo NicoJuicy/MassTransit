@@ -31,9 +31,10 @@ namespace MassTransit.Configuration
         public int? ConcurrentMessageLimit => _settings.ConcurrentMessageLimit;
         public bool ConfigureConsumeTopology => _settings.ConfigureConsumeTopology;
 
-        public void Configure<T>(T configurator)
+        public void Configure<T>(T configurator, IRegistrationContext? context)
             where T : IReceiveEndpointConfigurator
         {
+            _settings.ConfigureEndpoint(configurator, context);
         }
 
         protected abstract string FormatEndpointName(IEndpointNameFormatter formatter);

@@ -20,7 +20,7 @@
             await InputQueueSendEndpoint.Send(message);
 
             Guid? saga = await _repository.ShouldContainSagaInState(message.CorrelationId, _machine, _machine.WaitingToStart, TimeSpan.FromSeconds(8));
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
 
             await InputQueueSendEndpoint.Send(new Start(message.CorrelationId));
 
@@ -28,7 +28,7 @@
 
             saga = await _repository.ShouldContainSagaInState(x => x.CorrelationId == message.CorrelationId && x.StartAttempts == 1, _machine,
                 _machine.WaitingToStart, TimeSpan.FromSeconds(8));
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -36,7 +36,7 @@
             _machine = new TestStateMachine();
             _repository = new InMemorySagaRepository<Instance>();
 
-            configurator.UseRetry(x =>
+            configurator.UseMessageRetry(x =>
             {
                 x.Ignore<NotSupportedException>();
                 x.Immediate(2);

@@ -17,7 +17,14 @@
         /// <param name="password"></param>
         void Password(string password);
 
-        void UseSsl();
+        void UseSsl(bool enabled = true);
+
+        /// <summary>
+        /// Specify if SSL should be used, and if the port should be updated automatically to the default SSL port.
+        /// </summary>
+        /// <param name="enabled"></param>
+        /// <param name="updatePort"></param>
+        void UseSsl(bool enabled, bool updatePort);
 
         /// <summary>
         /// Sets a list of hosts to enable the failover transport
@@ -38,5 +45,11 @@
         void SetPrefetchPolicy(int limit);
 
         void SetQueuePrefetchPolicy(int limit);
+
+        /// <summary>
+        /// Previous versions has nms.AsyncSend enabled by default. This can result in message loss,
+        /// so now it's disabled by default. It can be enabled using this method, or by adding <see cref="TransportOptions"/>.
+        /// </summary>
+        void EnableAsyncSend();
     }
 }

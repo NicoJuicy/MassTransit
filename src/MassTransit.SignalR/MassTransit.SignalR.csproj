@@ -2,11 +2,11 @@
   <Import Project="../../signing.props" />
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(IsWindows)' == 'true' ">
-    <TargetFrameworks>$(TargetFrameworks);net462</TargetFrameworks>
+    <TargetFrameworks>$(TargetFrameworks);net472</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -14,16 +14,12 @@
     <Description>MassTransit SignalR Backplane support; $(Description)</Description>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net462'">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472'">
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' != 'net462'">
+  <ItemGroup Condition=" '$(TargetFramework)' != 'net472'">
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>

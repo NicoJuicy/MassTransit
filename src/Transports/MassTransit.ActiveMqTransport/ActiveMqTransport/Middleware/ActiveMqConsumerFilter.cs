@@ -36,18 +36,27 @@ namespace MassTransit.ActiveMqTransport.Middleware
 
             var consumers = new List<Task<ActiveMqConsumer>>
             {
-                CreateConsumer(context, new QueueEntity(0, receiveSettings.EntityName, receiveSettings.Durable, receiveSettings.AutoDelete),
-                    receiveSettings.Selector, executor)
+                CreateConsumer(context, new QueueEntity(0, GetReceiveEntityName(receiveSettings), receiveSettings.Durable,
+                    receiveSettings.AutoDelete), receiveSettings.Selector, executor)
             };
 
-            consumers.AddRange(_context.BrokerTopology.Consumers.Select(x =>
-                CreateConsumer(context, x.Destination, x.Selector, executor)));
+            consumers.AddRange(_context.BrokerTopology.Consumers.Where(x => x.Destination == null).Select(x =>
+                CreateConsumer(context, new TopicEntity(0, GetReceiveEntityName(receiveSettings, x.Source.EntityName), x.Source.Durable,
+                    x.Source.AutoDelete), x.Selector, executor)));
+
+            consumers.AddRange(_context.BrokerTopology.Consumers.Where(x => x.Destination != null).Select(x =>
+                CreateConsumer(context, new QueueEntity(0, GetReceiveEntityName(receiveSettings, x.Destination.EntityName), x.Destination.Durable,
+                    x.Destination.AutoDelete), x.Selector, executor)));
 
             ActiveMqConsumer[] actualConsumers = await Task.WhenAll(consumers).ConfigureAwait(false);
 
             var supervisor = CreateConsumerSupervisor(context, actualConsumers);
 
+            await supervisor.Ready.ConfigureAwait(false);
+
             LogContext.Debug?.Log("Consumers Ready: {InputAddress}", _context.InputAddress);
+
+            _context.AddConsumeAgent(supervisor);
 
             await _context.TransportObservers.NotifyReady(_context.InputAddress).ConfigureAwait(false);
 
@@ -70,14 +79,16 @@ namespace MassTransit.ActiveMqTransport.Middleware
             }
         }
 
+        string GetReceiveEntityName(ReceiveSettings settings, string entityName = null)
+        {
+            return settings.AutoDelete
+                ? entityName ?? settings.EntityName
+                : $"{entityName ?? settings.EntityName}?consumer.prefetchSize={settings.PrefetchCount}";
+        }
+
         Supervisor CreateConsumerSupervisor(SessionContext context, ActiveMqConsumer[] actualConsumers)
         {
-            var supervisor = new Supervisor();
-
-            foreach (var consumer in actualConsumers)
-                supervisor.Add(consumer);
-
-            _context.AddConsumeAgent(supervisor);
+            var supervisor = new ConsumerSupervisor(actualConsumers);
 
             void HandleException(Exception exception)
             {
@@ -88,13 +99,14 @@ namespace MassTransit.ActiveMqTransport.Middleware
 
             supervisor.SetReady();
 
-            supervisor.Completed.ContinueWith(task => context.ConnectionContext.Connection.ExceptionListener -= HandleException,
+            supervisor.Completed.ContinueWith(_ => context.ConnectionContext.Connection.ExceptionListener -= HandleException,
                 TaskContinuationOptions.ExecuteSynchronously);
 
             return supervisor;
         }
 
-        async Task<ActiveMqConsumer> CreateConsumer(SessionContext context, Queue entity, string selector, ChannelExecutor executor)
+        async Task<ActiveMqConsumer> CreateConsumer(SessionContext context, Queue entity, string selector,
+            ChannelExecutor executor)
         {
             var queue = await context.GetQueue(entity).ConfigureAwait(false);
 
@@ -104,9 +116,50 @@ namespace MassTransit.ActiveMqTransport.Middleware
 
             var consumer = new ActiveMqConsumer(context, (MessageConsumer)messageConsumer, _context, executor);
 
-            await consumer.Ready.ConfigureAwait(false);
+            return consumer;
+        }
+
+        async Task<ActiveMqConsumer> CreateConsumer(SessionContext context, Topic entity, string selector,
+            ChannelExecutor executor)
+        {
+            var topic = await context.GetTopic(entity).ConfigureAwait(false);
+
+            var messageConsumer = await context.CreateMessageConsumer(topic, selector, false).ConfigureAwait(false);
+
+            LogContext.Debug?.Log("Created consumer for {InputAddress}: {Topic}", _context.InputAddress, entity.EntityName);
+
+            var consumer = new ActiveMqConsumer(context, (MessageConsumer)messageConsumer, _context, executor);
 
             return consumer;
+        }
+
+
+        class ConsumerSupervisor :
+            Supervisor
+        {
+            public ConsumerSupervisor(ActiveMqConsumer[] consumers)
+            {
+                foreach (var consumer in consumers)
+                {
+                    if (IsStopping)
+                        return;
+
+                    consumer.Completed.ContinueWith(async _ =>
+                    {
+                        try
+                        {
+                            if (!IsStopping)
+                                await this.Stop("Consumer stopped, stopping supervisor").ConfigureAwait(false);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogContext.Warning?.Log(exception, "Stop Faulted");
+                        }
+                    }, TaskContinuationOptions.RunContinuationsAsynchronously);
+
+                    Add(consumer);
+                }
+            }
         }
 
 

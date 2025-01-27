@@ -34,6 +34,7 @@ namespace MassTransit
             }
 
             AddHostedService(collection);
+            AddInstrumentation(collection);
 
             var configurator = new ServiceCollectionBusConfigurator(collection);
 
@@ -50,18 +51,33 @@ namespace MassTransit
         /// </summary>
         /// <param name="collection"></param>
         /// <param name="configure"></param>
-        public static IServiceCollection AddMediator(this IServiceCollection collection, Action<IMediatorRegistrationConfigurator> configure = null)
+        /// <param name="baseAddress"></param>
+        public static IServiceCollection AddMediator(this IServiceCollection collection, Uri baseAddress,
+            Action<IMediatorRegistrationConfigurator> configure = null)
         {
             if (collection.Any(d => d.ServiceType == typeof(IMediator)))
                 throw new ConfigurationException("AddMediator() was already called and may only be called once per container.");
 
-            var configurator = new ServiceCollectionMediatorConfigurator(collection);
+            var configurator = new ServiceCollectionMediatorConfigurator(collection, baseAddress);
 
             configure?.Invoke(configurator);
+
+            AddInstrumentation(collection);
 
             configurator.Complete();
 
             return collection;
+        }
+
+        /// <summary>
+        /// Adds the MassTransit Mediator to the <paramref name="collection" />, and allows consumers, sagas, and activities (which are not supported
+        /// by the Mediator) to be configured.
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="configure"></param>
+        public static IServiceCollection AddMediator(this IServiceCollection collection, Action<IMediatorRegistrationConfigurator> configure = null)
+        {
+            return AddMediator(collection, null, configure);
         }
 
         /// <summary>
@@ -85,6 +101,7 @@ namespace MassTransit
             }
 
             AddHostedService(collection);
+            AddInstrumentation(collection);
 
             var configurator = new ServiceCollectionBusConfigurator<TBus, TBusInstance>(collection);
 
@@ -107,8 +124,6 @@ namespace MassTransit
         {
             if (configure == null)
                 throw new ArgumentNullException(nameof(configure));
-
-            AddHostedService(collection);
 
             var doIt = new Callback<TBus>(collection, configure);
 
@@ -155,6 +170,12 @@ namespace MassTransit
             services.Replace(new ServiceDescriptor(typeof(TService), typeof(TImplementation), ServiceLifetime.Scoped));
         }
 
+        static void AddInstrumentation(IServiceCollection collection)
+        {
+            collection.AddOptions<InstrumentationOptions>();
+            collection.AddSingleton<IConfigureOptions<InstrumentationOptions>, ConfigureDefaultInstrumentationOptions>();
+        }
+
         static void AddHostedService(IServiceCollection collection)
         {
             collection.AddOptions();
@@ -162,6 +183,7 @@ namespace MassTransit
             collection.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<HealthCheckServiceOptions>, ConfigureBusHealthCheckServiceOptions>());
 
             collection.AddOptions<MassTransitHostOptions>();
+            collection.TryAddSingleton<IValidateOptions<MassTransitHostOptions>, ValidateMassTransitHostOptions>();
             collection.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, MassTransitHostedService>());
         }
 
@@ -175,13 +197,15 @@ namespace MassTransit
 
 
             collection.RemoveAll<IBusDepot>();
-            collection.RemoveAll<ScopedConsumeContextProvider>();
+            collection.RemoveAll<IScopedConsumeContextProvider>();
+            collection.RemoveAll<Bind<IBus, ISetScopedConsumeContext>>();
+            collection.RemoveAll<Bind<IBus, IScopedConsumeContextProvider>>();
             collection.RemoveAll<IScopedBusContextProvider<IBus>>();
             collection.RemoveAll<ConsumeContext>();
             collection.RemoveAll<ISendEndpointProvider>();
             collection.RemoveAll<IPublishEndpoint>();
-            collection.RemoveAll<IConsumeScopeProvider>();
             collection.RemoveAll(typeof(IRequestClient<>));
+            collection.RemoveAll<IMessageScheduler>();
 
             collection.RemoveAll<Bind<IBus, IBusInstance>>();
             collection.RemoveAll<IBusInstance>();

@@ -3,7 +3,6 @@
     using System.Threading.Tasks;
     using MassTransit.Configuration;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
 
 
@@ -14,15 +13,20 @@
         [Test]
         public async Task Should_have_the_message_property()
         {
-            await InputQueueSendEndpoint.Send(new A {First = "Hello"});
+            await InputQueueSendEndpoint.Send(new A { First = "Hello" });
 
             ConsumeContext<A> result = await _received;
 
-            result.Message.First.ShouldBe("First");
-            result.Message.Second.ShouldBe("Second");
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Message.First, Is.EqualTo("First"));
+                Assert.That(result.Message.Second, Is.EqualTo("Second"));
+            });
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<A>> _received;
+        #pragma warning restore NUnit1032
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {

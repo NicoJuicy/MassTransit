@@ -67,11 +67,14 @@ namespace MassTransit.KafkaIntegration.Tests
 
             var result = await provider.GetTask<ConsumeContext<KafkaMessage>>();
 
-            Assert.AreEqual(message.Value.Text, result.Message.Text);
-            Assert.AreEqual(sendContext.MessageId, result.MessageId);
-            Assert.That(result.DestinationAddress, Is.EqualTo(new Uri($"loopback://localhost/{KafkaTopicAddress.PathPrefix}/{Topic}")));
+            await Assert.MultipleAsync(async () =>
+            {
+                Assert.That(result.Message.Text, Is.EqualTo(message.Value.Text));
+                Assert.That(result.MessageId, Is.EqualTo(sendContext.MessageId));
+                Assert.That(result.DestinationAddress, Is.EqualTo(new Uri($"loopback://localhost/{KafkaTopicAddress.PathPrefix}/{Topic}")));
 
-            Assert.That(await harness.Consumed.Any<KafkaMessage>());
+                Assert.That(await harness.Consumed.Any<KafkaMessage>());
+            });
         }
 
 
@@ -111,12 +114,13 @@ namespace MassTransit.KafkaIntegration.Tests
         }
     }
 
+
     public class ConcurrentKeysReceive_Specs :
         InMemoryTestFixture
     {
         const string Topic = "test-concurrent-keys";
-        const int NumMessages = 10;
-        const int NumKeys = 2;
+        const int NumMessages = 50;
+        const int NumKeys = 5;
 
         [Test]
         public async Task Should_receive_concurrently_by_keys()
@@ -135,15 +139,8 @@ namespace MassTransit.KafkaIntegration.Tests
                         rider.AddConsumer<KafkaMessageConsumer>();
                         rider.AddProducer<int, KafkaMessage>(Topic);
 
-                        rider.UsingKafka((context, k) =>
+                        rider.UsingKafka((_, _) =>
                         {
-                            k.TopicEndpoint<int, KafkaMessage>(Topic, nameof(ConcurrentKeysReceive_Specs), c =>
-                            {
-                                c.AutoOffsetReset = AutoOffsetReset.Earliest;
-                                c.ConcurrentMessageLimit = NumMessages;
-
-                                c.ConfigureConsumer<KafkaMessageConsumer>(context);
-                            });
                         });
                     });
                 }).BuildServiceProvider();
@@ -155,10 +152,22 @@ namespace MassTransit.KafkaIntegration.Tests
             for (var i = 0; i < NumMessages; i++)
                 await producer.Produce(i % NumKeys, new { Index = i + 1 }, harness.CancellationToken);
 
+            var kafka = provider.GetRequiredService<IKafkaRider>();
+
+            var connected = kafka.ConnectTopicEndpoint<int, KafkaMessage>(Topic, nameof(ConcurrentKeysReceive_Specs), (context, configurator) =>
+            {
+                configurator.AutoOffsetReset = AutoOffsetReset.Earliest;
+                configurator.ConcurrentMessageLimit = NumMessages;
+
+                configurator.ConfigureConsumer<KafkaMessageConsumer>(context);
+            });
+
+            await connected.Ready.OrCanceled(harness.CancellationToken);
+
             await provider.GetTask<ConsumeContext<KafkaMessage>>();
 
             IList<IReceivedMessage<KafkaMessage>> receivedMessages = await harness.Consumed.SelectAsync<KafkaMessage>().ToListAsync();
-            Assert.That(receivedMessages.Count, Is.EqualTo(NumMessages));
+            Assert.That(receivedMessages, Has.Count.EqualTo(NumMessages));
             var result = new int[NumKeys];
 
             foreach (IReceivedMessage<KafkaMessage> receivedMessage in receivedMessages)
@@ -186,7 +195,7 @@ namespace MassTransit.KafkaIntegration.Tests
             {
                 if (Interlocked.Decrement(ref _index) <= 0)
                     _taskCompletionSource.TrySetResult(context);
-                return Task.CompletedTask;
+                return Task.Delay(10);
             }
         }
 
@@ -327,7 +336,7 @@ namespace MassTransit.KafkaIntegration.Tests
             var result = await provider.GetTask<ConsumeContext<Batch<KafkaMessage>>>();
 
             for (var i = 0; i < batchSize; i++)
-                Assert.AreEqual(i, result.Message[i].Message.Index);
+                Assert.That(result.Message[i].Message.Index, Is.EqualTo(i));
         }
 
 
@@ -336,6 +345,7 @@ namespace MassTransit.KafkaIntegration.Tests
             int Index { get; }
         }
     }
+
 
     public class MultiGroupReceive_Specs :
         InMemoryTestFixture

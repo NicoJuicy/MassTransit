@@ -7,8 +7,7 @@ namespace MassTransit.Serialization
 
     public abstract class RawMessageSerializer
     {
-        protected virtual void SetRawMessageHeaders<T>(SendContext context)
-            where T : class
+        protected virtual void SetRawMessageHeaders(SendContext context)
         {
             if (context.MessageId.HasValue)
                 context.Headers.Set(MessageHeaders.MessageId, context.MessageId.Value.ToString());
@@ -25,7 +24,8 @@ namespace MassTransit.Serialization
             if (context.RequestId.HasValue)
                 context.Headers.Set(MessageHeaders.RequestId, context.RequestId.Value.ToString());
 
-            context.Headers.Set(MessageHeaders.MessageType, string.Join(";", MessageTypeCache<T>.MessageTypeNames));
+            if (context.SupportedMessageTypes?.Length > 0)
+                context.Headers.Set(MessageHeaders.MessageType, string.Join(";", context.SupportedMessageTypes));
 
             if (context.ResponseAddress != null)
                 context.Headers.Set(MessageHeaders.ResponseAddress, context.ResponseAddress);

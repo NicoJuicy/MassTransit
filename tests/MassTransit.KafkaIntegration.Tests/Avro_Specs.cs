@@ -5,11 +5,10 @@ namespace MassTransit.KafkaIntegration.Tests
     using System.Threading.Tasks;
     using AvroContracts.AvroContracts;
     using Confluent.Kafka;
-    using Confluent.Kafka.SyncOverAsync;
     using Confluent.SchemaRegistry;
-    using Confluent.SchemaRegistry.Serdes;
     using Microsoft.Extensions.DependencyInjection;
     using NUnit.Framework;
+    using Serializers;
     using TestFramework;
     using Testing;
 
@@ -22,21 +21,12 @@ namespace MassTransit.KafkaIntegration.Tests
         [Test]
         public async Task Should_produce()
         {
-            static IAsyncSerializer<T> GetSerializer<T>(IServiceProvider provider)
-            {
-                return new AvroSerializer<T>(provider.GetService<ISchemaRegistryClient>());
-            }
-
-            static IDeserializer<T> GetDeserializer<T>(IServiceProvider provider)
-            {
-                return new AvroDeserializer<T>(provider.GetService<ISchemaRegistryClient>()).AsSyncOverAsync();
-            }
-
             await using var provider = new ServiceCollection()
                 .AddSingleton<ISchemaRegistryClient>(new CachedSchemaRegistryClient(new Dictionary<string, string>
                 {
                     { "schema.registry.url", "localhost:8081" },
                 }))
+                .AddSingleton<IKafkaSerializerFactory, AvroKafkaSerializerFactory>()
                 .ConfigureKafkaTestOptions(options =>
                 {
                     options.CreateTopicsIfNotExists = true;
@@ -50,20 +40,15 @@ namespace MassTransit.KafkaIntegration.Tests
                     {
                         rider.AddConsumer<TestKafkaMessageConsumer<KafkaMessage>>();
 
-                        rider.AddProducer<string, KafkaMessage>(Topic, context => context.MessageId.ToString(), (context, cfg) =>
-                        {
-                            cfg.SetKeySerializer(GetSerializer<string>(context));
-                            cfg.SetValueSerializer(GetSerializer<KafkaMessage>(context));
-                        });
+                        rider.AddProducer<string, KafkaMessage>(Topic, context => context.MessageId.ToString());
 
                         rider.UsingKafka((context, k) =>
                         {
+                            k.SetSerializationFactory(context.GetRequiredService<IKafkaSerializerFactory>());
+
                             k.TopicEndpoint<string, KafkaMessage>(Topic, nameof(Avro_Specs), c =>
                             {
                                 c.AutoOffsetReset = AutoOffsetReset.Earliest;
-
-                                c.SetKeyDeserializer(GetDeserializer<string>(context));
-                                c.SetValueDeserializer(GetDeserializer<KafkaMessage>(context));
 
                                 c.ConfigureConsumer<TestKafkaMessageConsumer<KafkaMessage>>(context);
                             });
@@ -92,13 +77,16 @@ namespace MassTransit.KafkaIntegration.Tests
 
             var result = await provider.GetTask<ConsumeContext<KafkaMessage>>();
 
-            Assert.AreEqual("text", result.Message.Test);
-            Assert.That(result.SourceAddress, Is.EqualTo(new Uri("loopback://localhost/")));
-            Assert.That(result.DestinationAddress, Is.EqualTo(new Uri($"loopback://localhost/{KafkaTopicAddress.PathPrefix}/{Topic}")));
-            Assert.That(result.MessageId, Is.EqualTo(messageId));
-            Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
-            Assert.That(result.InitiatorId, Is.EqualTo(initiatorId));
-            Assert.That(result.ConversationId, Is.EqualTo(conversationId));
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Message.Test, Is.EqualTo("text"));
+                Assert.That(result.SourceAddress, Is.EqualTo(new Uri("loopback://localhost/")));
+                Assert.That(result.DestinationAddress, Is.EqualTo(new Uri($"loopback://localhost/{KafkaTopicAddress.PathPrefix}/{Topic}")));
+                Assert.That(result.MessageId, Is.EqualTo(messageId));
+                Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
+                Assert.That(result.InitiatorId, Is.EqualTo(initiatorId));
+                Assert.That(result.ConversationId, Is.EqualTo(conversationId));
+            });
         }
     }
 
@@ -111,21 +99,12 @@ namespace MassTransit.KafkaIntegration.Tests
         [Test]
         public async Task Should_use_the_default_endpoint_serializer()
         {
-            static IAsyncSerializer<T> GetSerializer<T>(IServiceProvider provider)
-            {
-                return new AvroSerializer<T>(provider.GetService<ISchemaRegistryClient>());
-            }
-
-            static IDeserializer<T> GetDeserializer<T>(IServiceProvider provider)
-            {
-                return new AvroDeserializer<T>(provider.GetService<ISchemaRegistryClient>()).AsSyncOverAsync();
-            }
-
             await using var provider = new ServiceCollection()
                 .AddSingleton<ISchemaRegistryClient>(new CachedSchemaRegistryClient(new Dictionary<string, string>
                 {
                     { "schema.registry.url", "localhost:8081" },
                 }))
+                .AddSingleton<IKafkaSerializerFactory, AvroKafkaSerializerFactory>()
                 .ConfigureKafkaTestOptions(options =>
                 {
                     options.CreateTopicsIfNotExists = true;
@@ -144,22 +123,16 @@ namespace MassTransit.KafkaIntegration.Tests
                     {
                         rider.AddConsumer<MessageHandler>();
 
-                        rider.AddProducer<string, KafkaMessage>(Topic, context => context.MessageId.ToString(), (context, cfg) =>
-                        {
-                            cfg.SetKeySerializer(GetSerializer<string>(context));
-                            cfg.SetValueSerializer(GetSerializer<KafkaMessage>(context));
-                        });
+                        rider.AddProducer<string, KafkaMessage>(Topic, context => context.MessageId.ToString());
 
                         rider.AddInMemoryInboxOutbox();
 
                         rider.UsingKafka((context, k) =>
                         {
+                            k.SetSerializationFactory(context.GetRequiredService<IKafkaSerializerFactory>());
                             k.TopicEndpoint<string, KafkaMessage>(Topic, nameof(Avro_Specs), c =>
                             {
                                 c.AutoOffsetReset = AutoOffsetReset.Earliest;
-
-                                c.SetKeyDeserializer(GetDeserializer<string>(context));
-                                c.SetValueDeserializer(GetDeserializer<KafkaMessage>(context));
 
                                 c.UseInMemoryInboxOutbox(context);
 
@@ -192,8 +165,11 @@ namespace MassTransit.KafkaIntegration.Tests
 
             Assert.That(message, Is.Not.Null);
 
-            Assert.That(message.Context.Message.OriginalMessageId, Is.EqualTo(messageId));
-            Assert.That(message.Context.Message.OriginalCorrelationId, Is.EqualTo(correlationId));
+            Assert.Multiple(() =>
+            {
+                Assert.That(message.Context.Message.OriginalMessageId, Is.EqualTo(messageId));
+                Assert.That(message.Context.Message.OriginalCorrelationId, Is.EqualTo(correlationId));
+            });
         }
 
 

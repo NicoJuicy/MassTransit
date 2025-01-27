@@ -1,18 +1,23 @@
 ﻿namespace MassTransit.RabbitMqTransport
 {
     using System;
+    using System.Collections.Generic;
     using System.Net.Mime;
     using System.Threading.Tasks;
+    using Context;
     using RabbitMQ.Client;
+    using Serialization;
     using Transports;
 
 
     public sealed class RabbitMqReceiveContext :
         BaseReceiveContext,
-        RabbitMqBasicConsumeContext
+        RabbitMqBasicConsumeContext,
+        TransportReceiveContext,
+        ITransportSequenceNumber
     {
-        public RabbitMqReceiveContext(string exchange, string routingKey, string consumerTag, ulong deliveryTag, byte[] body,
-            bool redelivered, IBasicProperties properties, RabbitMqReceiveEndpointContext receiveEndpointContext, params object[] payloads)
+        public RabbitMqReceiveContext(string exchange, string routingKey, string consumerTag, ulong deliveryTag, ReadOnlyMemory<byte> body,
+            bool redelivered, IReadOnlyBasicProperties properties, RabbitMqReceiveEndpointContext receiveEndpointContext, params object[] payloads)
             : base(redelivered, receiveEndpointContext, payloads)
         {
             Exchange = exchange;
@@ -21,20 +26,41 @@
             DeliveryTag = deliveryTag;
             Properties = properties;
 
-            Body = new BytesMessageBody(body);
+            Body = new MemoryMessageBody(body);
         }
 
         protected override IHeaderProvider HeaderProvider => new RabbitMqHeaderProvider(this);
 
         public override MessageBody Body { get; }
 
+        public ulong? SequenceNumber => DeliveryTag;
+
         public string ConsumerTag { get; }
         public ulong DeliveryTag { get; }
         public string Exchange { get; }
         public string RoutingKey { get; }
-        public IBasicProperties Properties { get; }
+        public IReadOnlyBasicProperties Properties { get; }
 
-        byte[] RabbitMqBasicConsumeContext.Body => Body.GetBytes();
+        public IDictionary<string, object> GetTransportProperties()
+        {
+            var properties = new Lazy<Dictionary<string, object>>(() => new Dictionary<string, object>());
+
+            if (!string.IsNullOrWhiteSpace(RoutingKey))
+                properties.Value[RabbitMqTransportPropertyNames.RoutingKey] = RoutingKey;
+
+            if (Properties.IsAppIdPresent())
+                properties.Value[RabbitMqTransportPropertyNames.AppId] = Properties.AppId;
+            if (Properties.IsPriorityPresent())
+                properties.Value[RabbitMqTransportPropertyNames.Priority] = Properties.Priority;
+            if (Properties.IsReplyToPresent())
+                properties.Value[RabbitMqTransportPropertyNames.ReplyTo] = Properties.ReplyTo;
+            if (Properties.IsTypePresent())
+                properties.Value[RabbitMqTransportPropertyNames.Type] = Properties.Type;
+            if (Properties.IsUserIdPresent())
+                properties.Value[RabbitMqTransportPropertyNames.UserId] = Properties.UserId;
+
+            return properties.IsValueCreated ? properties.Value : null;
+        }
 
         protected override ContentType GetContentType()
         {
@@ -77,7 +103,9 @@
             {
                 var endpoint = await _sendEndpointProvider.GetSendEndpoint(address).ConfigureAwait(false);
 
-                return new ReplyToSendEndpoint(endpoint, _replyTo);
+                return address.IsReplyToAddress()
+                    ? new ReplyToSendEndpoint(endpoint, _replyTo)
+                    : endpoint;
             }
         }
     }

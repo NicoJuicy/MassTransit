@@ -13,6 +13,10 @@ namespace MassTransit
 #endif
 
 
+// We need to target netstandard2.0, so keep using ref parameter.
+// CS9191: The 'ref' modifier for argument 2 corresponding to 'in' parameter is equivalent to 'in'. Consider using 'in' instead.
+#pragma warning disable CS9191
+
     /// <summary>
     /// A NewId is a type that fits into the same space as a Guid/Uuid/unique identifier,
     /// but is guaranteed to be both unique and ordered, assuming it is generated using
@@ -89,6 +93,11 @@ namespace MassTransit
             get
             {
                 var ticks = (long)(((ulong)_a << 32) | (uint)_b);
+
+                if (ticks > DateTime.MaxValue.Ticks)
+                    return DateTime.MaxValue;
+                if (ticks < DateTime.MinValue.Ticks)
+                    return DateTime.MinValue;
 
                 return new DateTime(ticks, DateTimeKind.Utc);
             }

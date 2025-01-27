@@ -7,14 +7,10 @@ namespace MassTransit.RabbitMqTransport
     {
         public static bool ChannelShouldBeClosed(this OperationInterruptedException ex)
         {
-            return ex.ShutdownReason?.ReplyCode switch
-            {
-                403 => true, // access refused
-                404 => true, // not found
-                405 => true, // locked
-                406 => true, // precondition failed
-                _ => false
-            };
+            if (ex.ShutdownReason == null)
+                return false;
+
+            return ex.ShutdownReason?.ReplyCode >= 400;
         }
     }
 }

@@ -47,14 +47,13 @@ namespace MassTransit.MongoDbIntegration.Tests
 
             var events = provider.GetRequiredService<IList<Event>>();
 
-            Assert.That(events.Count, Is.EqualTo(100));
+            Assert.That(events, Has.Count.EqualTo(100));
         }
     }
 
 
     namespace InboxLock
     {
-        using System;
         using System.Linq;
 
 
@@ -86,19 +85,12 @@ namespace MassTransit.MongoDbIntegration.Tests
         public class InboxLockEntityFrameworkConsumerDefinition :
             ConsumerDefinition<InboxLockConsumer>
         {
-            readonly IServiceProvider _provider;
-
-            public InboxLockEntityFrameworkConsumerDefinition(IServiceProvider provider)
-            {
-                _provider = provider;
-            }
-
             protected override void ConfigureConsumer(IReceiveEndpointConfigurator endpointConfigurator,
-                IConsumerConfigurator<InboxLockConsumer> consumerConfigurator)
+                IConsumerConfigurator<InboxLockConsumer> consumerConfigurator, IRegistrationContext context)
             {
                 endpointConfigurator.UseMessageRetry(r => r.Intervals(10, 50, 100, 100, 100, 100, 100, 100));
 
-                endpointConfigurator.UseMongoDbOutbox(_provider);
+                endpointConfigurator.UseMongoDbOutbox(context);
             }
         }
     }

@@ -105,15 +105,18 @@ namespace MassTransit.Internals
 
             async Task WaitAsync()
             {
-                var delayTask = Task.Delay(Debugger.IsAttached ? Timeout.InfiniteTimeSpan : timeout, cancellationToken);
-
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var delayTask = Task.Delay(Debugger.IsAttached ? Timeout.InfiniteTimeSpan : timeout, cts.Token);
                 var completed = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
+
                 if (completed == delayTask)
                 {
                     task.IgnoreUnobservedExceptions();
 
                     throw new TimeoutException(FormatTimeoutMessage(memberName, filePath, lineNumber));
                 }
+
+                cts.Cancel();
 
                 task.GetAwaiter().GetResult();
             }
@@ -153,15 +156,18 @@ namespace MassTransit.Internals
 
             async Task<T> WaitAsync()
             {
-                var delayTask = Task.Delay(Debugger.IsAttached ? Timeout.InfiniteTimeSpan : timeout, cancellationToken);
-
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var delayTask = Task.Delay(Debugger.IsAttached ? Timeout.InfiniteTimeSpan : timeout, cts.Token);
                 var completed = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
+
                 if (completed == delayTask)
                 {
                     task.IgnoreUnobservedExceptions();
 
                     throw new TimeoutException(FormatTimeoutMessage(memberName, filePath, lineNumber));
                 }
+
+                cts.Cancel();
 
                 return task.GetAwaiter().GetResult();
             }
@@ -202,6 +208,50 @@ namespace MassTransit.Internals
             {
                 var _ = t.Exception;
             }, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+        }
+
+        public static void TrySetFromTask<T>(this TaskCompletionSource<T> source, Task task, T value)
+        {
+            switch (task)
+            {
+                case { IsCanceled: true }:
+                    source.TrySetCanceled();
+                    break;
+                case { IsFaulted: true, Exception.InnerExceptions: not null }:
+                    source.TrySetException(task.Exception.InnerExceptions);
+                    break;
+                case { IsFaulted: true, Exception: not null }:
+                    source.TrySetException(task.Exception);
+                    break;
+                case { IsFaulted: true, Exception: null }:
+                    source.TrySetException(new InvalidOperationException("The context faulted but no exception was present."));
+                    break;
+                default:
+                    source.TrySetResult(value);
+                    break;
+            }
+        }
+
+        public static void TrySetFromTask<T>(this TaskCompletionSource<T> source, Task<T> task)
+        {
+            switch (task)
+            {
+                case { IsCanceled: true }:
+                    source.TrySetCanceled();
+                    break;
+                case { IsFaulted: true, Exception.InnerExceptions: not null }:
+                    source.TrySetException(task.Exception.InnerExceptions);
+                    break;
+                case { IsFaulted: true, Exception: not null }:
+                    source.TrySetException(task.Exception);
+                    break;
+                case { IsFaulted: true, Exception: null }:
+                    source.TrySetException(new InvalidOperationException("The context faulted but no exception was present."));
+                    break;
+                default:
+                    source.TrySetResult(task.Result);
+                    break;
+            }
         }
 
         /// <summary>

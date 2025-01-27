@@ -7,7 +7,6 @@
     using MassTransit.Testing;
     using Microsoft.Extensions.DependencyInjection;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework;
     using TestFramework.Messages;
 
@@ -21,11 +20,13 @@
         {
             Response<PongMessage> message = await _response;
 
-            message.Message.CorrelationId.ShouldBe(_ping.Result.Message.CorrelationId);
+            Assert.That(message.Message.CorrelationId, Is.EqualTo(_ping.Result.Message.CorrelationId));
         }
 
+        #pragma warning disable NUnit1032
         Task<ConsumeContext<PingMessage>> _ping;
         Task<Response<PongMessage>> _response;
+        #pragma warning restore NUnit1032
         IRequestClient<PingMessage> _requestClient;
 
         [OneTimeSetUp]
@@ -53,7 +54,9 @@
             Assert.That(async () => await _response, Throws.TypeOf<RequestTimeoutException>());
         }
 
+        #pragma warning disable NUnit1032
         Task<Response<PongMessage>> _response;
+        #pragma warning restore NUnit1032
         IRequestClient<PingMessage> _requestClient;
 
         [OneTimeSetUp]
@@ -87,26 +90,116 @@
                 unobservedTaskExceptions.Add(eventArgs.Exception);
             };
 
-            Assert.That(async () => await _response, Throws.TypeOf<RequestTimeoutException>());
+            IRequestClient<PingMessage> requestClient = Bus.CreateRequestClient<PingMessage>(InputQueueAddress, TimeSpan.FromSeconds(1));
+
+            Task<Response<PongMessage>> response = requestClient.GetResponse<PongMessage>(new PingMessage());
+
+            Assert.That(async () => await response, Throws.TypeOf<RequestTimeoutException>());
 
             GC.Collect();
             await Task.Delay(1000);
             GC.WaitForPendingFinalizers();
             GC.Collect();
 
-            Assert.That(unhandledExceptions, Is.Empty);
-            Assert.That(unobservedTaskExceptions, Is.Empty);
+            Assert.Multiple(() =>
+            {
+                Assert.That(unhandledExceptions, Is.Empty);
+                Assert.That(unobservedTaskExceptions, Is.Empty);
+            });
         }
+    }
 
-        Task<Response<PongMessage>> _response;
-        IRequestClient<PingMessage> _requestClient;
 
-        [OneTimeSetUp]
-        public void Setup()
+    [TestFixture]
+    [Explicit]
+    public class Sending_a_request_using_mediator_to_a_missing_service_that_times_out :
+        InMemoryTestFixture
+    {
+        [Test]
+        public async Task Should_timeout_without_exceptions()
         {
-            _requestClient = Bus.CreateRequestClient<PingMessage>(InputQueueAddress, TimeSpan.FromSeconds(1));
+            var mediator = MassTransit.Bus.Factory.CreateMediator(x =>
+            {
+                x.Handler<PingMessage>(async context =>
+                {
+                });
+            });
 
-            _response = _requestClient.GetResponse<PongMessage>(new PingMessage());
+            List<object> unhandledExceptions = new List<object>();
+            List<Exception> unobservedTaskExceptions = new List<Exception>();
+
+            AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+            {
+                unhandledExceptions.Add(eventArgs.ExceptionObject);
+            };
+
+            TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
+            {
+                unobservedTaskExceptions.Add(eventArgs.Exception);
+            };
+
+            IRequestClient<PingMessage> requestClient = mediator.CreateRequestClient<PingMessage>(InputQueueAddress, TimeSpan.FromSeconds(1));
+
+            Task<Response<PongMessage>> response = requestClient.GetResponse<PongMessage>(new PingMessage());
+
+            Assert.That(async () => await response, Throws.TypeOf<RequestTimeoutException>());
+
+            GC.Collect();
+            await Task.Delay(1000);
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(unhandledExceptions, Is.Empty, "Unhandled");
+                Assert.That(unobservedTaskExceptions, Is.Empty, "Unobserved");
+            });
+        }
+    }
+
+
+    [TestFixture]
+    [Explicit]
+    public class Sending_a_request_using_mediator_that_faults :
+        InMemoryTestFixture
+    {
+        [Test]
+        public async Task Should_observe_all_exceptions()
+        {
+            var mediator = MassTransit.Bus.Factory.CreateMediator(x =>
+            {
+            });
+
+            List<object> unhandledExceptions = new List<object>();
+            List<Exception> unobservedTaskExceptions = new List<Exception>();
+
+            AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+            {
+                unhandledExceptions.Add(eventArgs.ExceptionObject);
+            };
+
+            TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
+            {
+                eventArgs.SetObserved();
+                unobservedTaskExceptions.Add(eventArgs.Exception);
+            };
+
+            IRequestClient<PingMessage> requestClient = mediator.CreateRequestClient<PingMessage>(InputQueueAddress, TimeSpan.FromSeconds(1));
+
+            Task<Response<PongMessage>> response = requestClient.GetResponse<PongMessage>(new PingMessage());
+
+            Assert.That(async () => await response, Throws.TypeOf<RequestException>());
+
+            GC.Collect();
+            await Task.Delay(1000);
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(unhandledExceptions, Is.Empty, "Unhandled");
+                Assert.That(unobservedTaskExceptions, Is.Empty, "Unobserved");
+            });
         }
     }
 
@@ -121,8 +214,9 @@
             Assert.That(async () => await _response, Throws.TypeOf<RequestFaultException>());
         }
 
-        Task<ConsumeContext<PingMessage>> _ping;
+        #pragma warning disable NUnit1032
         Task<Response<PongMessage>> _response;
+        #pragma warning restore NUnit1032
         IRequestClient<PingMessage> _requestClient;
 
         [OneTimeSetUp]
@@ -135,10 +229,7 @@
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
-            _ping = Handler<PingMessage>(configurator, async x =>
-            {
-                throw new InvalidOperationException("This is an expected test failure");
-            });
+            _ = Handler<PingMessage>(configurator, async _ => throw new InvalidOperationException("This is an expected test failure"));
         }
     }
 
@@ -153,8 +244,9 @@
             Assert.That(async () => await _response, Throws.TypeOf<TaskCanceledException>());
         }
 
-        Task<ConsumeContext<PingMessage>> _ping;
+        #pragma warning disable NUnit1032
         Task<Response<PongMessage>> _response;
+        #pragma warning restore NUnit1032
         IRequestClient<PingMessage> _requestClient;
 
         [OneTimeSetUp]
@@ -175,7 +267,7 @@
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
         {
-            _ping = Handler<PingMessage>(configurator, async x =>
+            _ = Handler<PingMessage>(configurator, async x =>
             {
                 await Task.Delay(2000);
                 await x.RespondAsync(new PongMessage(x.Message.CorrelationId));

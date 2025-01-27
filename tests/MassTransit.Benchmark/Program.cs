@@ -8,7 +8,13 @@
     using System.Threading.Tasks;
     using BusOutbox;
     using Latency;
+    using MassTransit.Logging;
+    using MassTransit.Monitoring;
     using NDesk.Options;
+    using OpenTelemetry;
+    using OpenTelemetry.Metrics;
+    using OpenTelemetry.Resources;
+    using OpenTelemetry.Trace;
     using RequestResponse;
 
 
@@ -23,6 +29,7 @@
 
             var optionSet = new ProgramOptionSet();
 
+            var disposables = new List<IDisposable>();
             try
             {
                 _remaining = optionSet.Parse(args);
@@ -35,6 +42,24 @@
 
                 if (optionSet.Verbose)
                 {
+                }
+
+                if (optionSet.EnableMetrics)
+                {
+                    disposables.Add(Sdk.CreateMeterProviderBuilder()
+                        .AddMeter(InstrumentationOptions.MeterName)
+                        .ConfigureResource(r => r.AddService("MassTransit.Benchmark"))
+                        .AddOtlpExporter()
+                        .Build());
+                }
+
+                if (optionSet.EnableTraces)
+                {
+                    disposables.Add(Sdk.CreateTracerProviderBuilder()
+                        .AddSource(DiagnosticHeaders.DefaultListenerName)
+                        .ConfigureResource(r => r.AddService("MassTransit.Benchmark"))
+                        .AddOtlpExporter()
+                        .Build());
                 }
 
                 optionSet.ShowOptions();
@@ -69,6 +94,10 @@
             catch (Exception ex)
             {
                 Console.WriteLine("Crashed: {0}", ex.Message);
+            }
+            finally
+            {
+                disposables.ForEach(x => x.Dispose());
             }
         }
 
@@ -121,15 +150,6 @@
 
                 transport = new ActiveMqMessageLatencyTransport(activeMqOptionSet, settings);
             }
-            else if (optionSet.Transport == ProgramOptionSet.TransportOptions.Grpc)
-            {
-                var grpcOptionSet = new GrpcOptionSet();
-                grpcOptionSet.Parse(_remaining);
-
-                grpcOptionSet.ShowOptions();
-
-                transport = new GrpcMessageLatencyTransport(grpcOptionSet, settings);
-            }
             else if (optionSet.Transport == ProgramOptionSet.TransportOptions.Kafka)
             {
                 var kafkaOptionSet = new KafkaOptionSet();
@@ -138,6 +158,15 @@
                 kafkaOptionSet.ShowOptions();
 
                 transport = new KafkaMessageLatencyTransport(kafkaOptionSet, settings);
+            }
+            else if (optionSet.Transport == ProgramOptionSet.TransportOptions.Sql)
+            {
+                var options = new SqlOptionSet();
+                options.Parse(_remaining);
+
+                options.ShowOptions();
+
+                transport = new SqlMessageLatencyTransport(options, settings);
             }
             else if (optionSet.Transport == ProgramOptionSet.TransportOptions.Mediator)
                 transport = new MediatorMessageLatencyTransport(settings);

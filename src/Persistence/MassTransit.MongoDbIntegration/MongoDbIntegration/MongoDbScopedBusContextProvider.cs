@@ -12,10 +12,16 @@ namespace MassTransit.MongoDbIntegration
         where TBus : class, IBus
     {
         public MongoDbScopedBusContextProvider(TBus bus, MongoDbContext dbContext, IBusOutboxNotification notification,
-            Bind<TBus, IClientFactory> clientFactory, ScopedConsumeContextProvider consumeContextProvider, IServiceProvider provider)
+            Bind<TBus, IClientFactory> clientFactory, Bind<TBus, IScopedConsumeContextProvider> consumeContextProvider,
+            IScopedConsumeContextProvider globalConsumeContextProvider, IServiceProvider provider)
         {
-            if (consumeContextProvider.HasContext)
-                Context = new ConsumeContextScopedBusContext(consumeContextProvider.GetContext(), clientFactory.Value);
+            if (consumeContextProvider.Value.HasContext)
+                Context = new ConsumeContextScopedBusContext(consumeContextProvider.Value.GetContext(), clientFactory.Value);
+            else if (globalConsumeContextProvider.HasContext)
+            {
+                Context = new MongoDbConsumeContextScopedBusContext<TBus>(bus, dbContext, notification, clientFactory.Value, provider,
+                    globalConsumeContextProvider.GetContext());
+            }
             else
                 Context = new MongoDbScopedBusContext<TBus>(bus, dbContext, notification, clientFactory.Value, provider);
         }

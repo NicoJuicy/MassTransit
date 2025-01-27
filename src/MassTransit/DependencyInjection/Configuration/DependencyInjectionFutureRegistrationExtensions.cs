@@ -58,6 +58,27 @@ namespace MassTransit.Configuration
             return register.Register(collection, registrar);
         }
 
+        public static IFutureRegistration RegisterFuture(this IServiceCollection collection, IContainerRegistrar registrar, Type futureType,
+            Type futureDefinitionType = null)
+        {
+            if (!futureType.HasInterface<SagaStateMachine<FutureState>>())
+                throw new ArgumentException($"The registered type must be a future: {TypeCache.GetShortName(futureType)}");
+
+            futureDefinitionType ??= typeof(DefaultFutureDefinition<>).MakeGenericType(futureType);
+
+            if (!futureDefinitionType.ClosesType(typeof(ISagaDefinition<>), out Type[] types) || types[0] != futureType)
+            {
+                throw new ArgumentException(
+                    $"{TypeCache.GetShortName(futureDefinitionType)} is not a future definition of {TypeCache.GetShortName(futureType)}",
+                    nameof(futureDefinitionType));
+            }
+
+            var sagaRegistrar =
+                (IFutureRegistrar)Activator.CreateInstance(typeof(FutureDefinitionRegistrar<,>).MakeGenericType(futureType, futureDefinitionType));
+
+            return sagaRegistrar.Register(collection, registrar);
+        }
+
 
         interface IFutureRegistrar
         {
@@ -73,7 +94,7 @@ namespace MassTransit.Configuration
             {
                 collection.TryAddSingleton<TFuture>();
 
-                return registrar.GetOrAdd<IFutureRegistration>(typeof(TFuture), _ => new FutureRegistration<TFuture>());
+                return registrar.GetOrAddRegistration<IFutureRegistration>(typeof(TFuture), _ => new FutureRegistration<TFuture>(registrar));
             }
         }
 
@@ -87,8 +108,7 @@ namespace MassTransit.Configuration
             {
                 var registration = base.Register(collection, registrar);
 
-                collection.AddSingleton<TDefinition>();
-                collection.AddSingleton<IFutureDefinition<TFuture>>(provider => provider.GetRequiredService<TDefinition>());
+                registrar.AddDefinition<IFutureDefinition<TFuture>, TDefinition>();
 
                 return registration;
             }

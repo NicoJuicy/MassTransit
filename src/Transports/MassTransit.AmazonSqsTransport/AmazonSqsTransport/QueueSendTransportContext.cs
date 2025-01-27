@@ -33,7 +33,7 @@ namespace MassTransit.AmazonSqsTransport
         }
 
         public override string EntityName { get; }
-        public override string ActivitySystem => "sqs";
+        public override string ActivitySystem => "aws_sqs";
 
         public Task Send(IPipe<ClientContext> pipe, CancellationToken cancellationToken = default)
         {
@@ -56,7 +56,7 @@ namespace MassTransit.AmazonSqsTransport
 
         public override IEnumerable<IAgent> GetAgentHandles()
         {
-            return new IAgent[] { _supervisor };
+            return [_supervisor];
         }
 
         public Task<SendContext<T>> CreateSendContext<T>(ClientContext context, T message, IPipe<SendContext<T>> pipe,

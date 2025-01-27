@@ -4,19 +4,19 @@
     {
         using System;
         using System.Threading.Tasks;
-        using MassTransit.Testing;
         using NUnit.Framework;
         using RabbitMQ.Client;
+        using Testing;
         using Util;
 
 
         public class ConsumerBindingTestFixture :
             RabbitMqTestFixture
         {
-            protected override void OnCleanupVirtualHost(IModel model)
+            protected override async Task OnCleanupVirtualHost(IChannel channel)
             {
-                model.ExchangeDelete(NameFormatter.GetMessageName(typeof(A)).ToString());
-                model.ExchangeDelete(NameFormatter.GetMessageName(typeof(B)).ToString());
+                await channel.ExchangeDeleteAsync(NameFormatter.GetMessageName(typeof(A)));
+                await channel.ExchangeDeleteAsync(NameFormatter.GetMessageName(typeof(B)));
             }
         }
 
@@ -170,8 +170,8 @@
             [Test]
             public async Task Should_receive_the_message_a()
             {
-                Guid? sagaId = await _repository.ShouldContainSaga(_sagaId, TestTimeout);
-                Assert.IsTrue(sagaId.HasValue);
+                Guid? sagaId = await SagaRepository.ShouldContainSaga(_sagaId, TestTimeout);
+                Assert.That(sagaId.HasValue, Is.True);
 
                 var saga = _repository[sagaId.Value].Instance;
 
@@ -181,8 +181,8 @@
             [Test]
             public async Task Should_receive_the_message_b()
             {
-                Guid? sagaId = await _repository.ShouldContainSaga(_sagaId, TestTimeout);
-                Assert.IsTrue(sagaId.HasValue);
+                Guid? sagaId = await SagaRepository.ShouldContainSaga(_sagaId, TestTimeout);
+                Assert.That(sagaId.HasValue, Is.True);
 
                 var saga = _repository[sagaId.Value].Instance;
 
@@ -192,6 +192,7 @@
             }
 
             InMemorySagaRepository<TestSaga> _repository;
+            ISagaRepository<TestSaga> SagaRepository => _repository;
             Guid _sagaId;
 
             [OneTimeSetUp]

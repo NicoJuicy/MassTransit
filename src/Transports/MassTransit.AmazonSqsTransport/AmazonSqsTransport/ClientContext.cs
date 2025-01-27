@@ -17,15 +17,13 @@ namespace MassTransit.AmazonSqsTransport
 
         Task<QueueInfo> CreateQueue(Queue queue);
 
-        Task CreateQueueSubscription(Topology.Topic topic, Queue queue);
+        Task<bool> CreateQueueSubscription(Topology.Topic topic, Queue queue);
 
         Task DeleteTopic(Topology.Topic topic);
 
         Task DeleteQueue(Queue queue);
 
-        Task<PublishRequest> CreatePublishRequest(string topicName, string body);
-
-        Task Publish(PublishRequest request, CancellationToken cancellationToken = default);
+        Task Publish(string topicName, PublishBatchRequestEntry request, CancellationToken cancellationToken = default);
 
         Task SendMessage(string queueName, SendMessageBatchRequestEntry request, CancellationToken cancellationToken);
 

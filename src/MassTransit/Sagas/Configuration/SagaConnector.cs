@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using Metadata;
     using Util;
 
 
@@ -16,7 +17,7 @@
         {
             try
             {
-                if (!MessageTypeCache<TSaga>.HasSagaInterfaces)
+                if (!RegistrationMetadata.IsSaga(typeof(TSaga)))
                     throw new ConfigurationException("The specified type is does not support any saga methods: " + TypeCache<TSaga>.ShortName);
 
                 _connectors = Initiates()
@@ -43,7 +44,7 @@
 
         ConnectHandle ISagaConnector.ConnectSaga<T>(IConsumePipeConnector consumePipe, ISagaRepository<T> repository, ISagaSpecification<T> specification)
         {
-            var handles = new List<ConnectHandle>();
+            var handles = new List<ConnectHandle>(_connectors.Count);
             try
             {
                 foreach (ISagaMessageConnector<T> connector in _connectors.Cast<ISagaMessageConnector<T>>())

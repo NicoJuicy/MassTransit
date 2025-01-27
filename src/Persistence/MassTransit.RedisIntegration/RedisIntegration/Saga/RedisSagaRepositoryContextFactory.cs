@@ -8,19 +8,20 @@ namespace MassTransit.RedisIntegration.Saga
 
 
     public class RedisSagaRepositoryContextFactory<TSaga> :
-        ISagaRepositoryContextFactory<TSaga>
+        ISagaRepositoryContextFactory<TSaga>,
+        ILoadSagaRepositoryContextFactory<TSaga>
         where TSaga : class, ISagaVersion
     {
         readonly Func<IDatabase> _databaseFactory;
         readonly ISagaConsumeContextFactory<DatabaseContext<TSaga>, TSaga> _factory;
         readonly RedisSagaRepositoryOptions<TSaga> _options;
 
-        public RedisSagaRepositoryContextFactory(ConnectionMultiplexer multiplexer, ISagaConsumeContextFactory<DatabaseContext<TSaga>, TSaga> factory,
+        public RedisSagaRepositoryContextFactory(IServiceProvider provider, ISagaConsumeContextFactory<DatabaseContext<TSaga>, TSaga> factory,
             RedisSagaRepositoryOptions<TSaga> options)
         {
             IDatabase DatabaseFactory()
             {
-                return options.DatabaseSelector(multiplexer);
+                return options.DatabaseSelector(options.ConnectionFactory(provider));
             }
 
             _databaseFactory = DatabaseFactory;
@@ -36,6 +37,24 @@ namespace MassTransit.RedisIntegration.Saga
 
             _factory = factory;
             _options = options;
+        }
+
+        public async Task<T> Execute<T>(Func<LoadSagaRepositoryContext<TSaga>, Task<T>> asyncMethod, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            var database = _databaseFactory();
+
+            var databaseContext = new RedisDatabaseContext<TSaga>(database, _options);
+            try
+            {
+                var repositoryContext = new RedisSagaRepositoryContext<TSaga>(databaseContext, cancellationToken);
+
+                return await asyncMethod(repositoryContext).ConfigureAwait(false);
+            }
+            finally
+            {
+                await databaseContext.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         public void Probe(ProbeContext context)
@@ -68,24 +87,6 @@ namespace MassTransit.RedisIntegration.Saga
             where T : class
         {
             throw new NotImplementedByDesignException("Redis saga repository does not support queries");
-        }
-
-        public async Task<T> Execute<T>(Func<SagaRepositoryContext<TSaga>, Task<T>> asyncMethod, CancellationToken cancellationToken = default)
-            where T : class
-        {
-            var database = _databaseFactory();
-
-            var databaseContext = new RedisDatabaseContext<TSaga>(database, _options);
-            try
-            {
-                var repositoryContext = new RedisSagaRepositoryContext<TSaga>(databaseContext, cancellationToken);
-
-                return await asyncMethod(repositoryContext).ConfigureAwait(false);
-            }
-            finally
-            {
-                await databaseContext.DisposeAsync().ConfigureAwait(false);
-            }
         }
     }
 }

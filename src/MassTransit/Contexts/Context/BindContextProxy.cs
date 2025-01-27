@@ -1,7 +1,6 @@
 ﻿namespace MassTransit.Context
 {
     using System;
-    using System.Reflection;
     using System.Threading;
 
 
@@ -29,7 +28,7 @@
 
         public bool HasPayloadType(Type payloadType)
         {
-            return payloadType.GetTypeInfo().IsInstanceOfType(Right) || Left.HasPayloadType(payloadType);
+            return payloadType.IsInstanceOfType(Right) || Left.HasPayloadType(payloadType);
         }
 
         public bool TryGetPayload<T>(out T payload)

@@ -90,32 +90,36 @@ namespace MassTransit.Configuration
 
         static void RegisterClassMaps()
         {
-            if (!BsonClassMap.IsClassMapRegistered(typeof(InboxState)))
+            BsonClassMap.TryRegisterClassMap(new BsonClassMap<InboxState>(cfg =>
             {
-                BsonClassMap.RegisterClassMap(new BsonClassMap<InboxState>(cfg =>
-                {
-                    cfg.AutoMap();
-                    cfg.MapIdProperty(x => x.Id);
-                }));
-            }
+                cfg.AutoMap();
+                cfg.MapIdProperty(x => x.Id).EnsureGuidRepresentationSpecified();
 
-            if (!BsonClassMap.IsClassMapRegistered(typeof(OutboxState)))
-            {
-                BsonClassMap.RegisterClassMap(new BsonClassMap<OutboxState>(cfg =>
-                {
-                    cfg.AutoMap();
-                    cfg.MapIdProperty(x => x.OutboxId);
-                }));
-            }
+                cfg.MapProperty(x => x.MessageId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.ConsumerId).EnsureGuidRepresentationSpecified();
+            }));
 
-            if (!BsonClassMap.IsClassMapRegistered(typeof(OutboxMessage)))
+            BsonClassMap.TryRegisterClassMap(new BsonClassMap<OutboxState>(cfg =>
             {
-                BsonClassMap.RegisterClassMap(new BsonClassMap<OutboxMessage>(cfg =>
-                {
-                    cfg.AutoMap();
-                    cfg.MapIdProperty(x => x.Id);
-                }));
-            }
+                cfg.AutoMap();
+                cfg.MapIdProperty(x => x.OutboxId).EnsureGuidRepresentationSpecified();
+            }));
+
+            BsonClassMap.TryRegisterClassMap(new BsonClassMap<OutboxMessage>(cfg =>
+            {
+                cfg.AutoMap();
+                cfg.MapIdProperty(x => x.Id);
+
+                cfg.MapProperty(x => x.InboxMessageId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.InboxConsumerId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.OutboxId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.MessageId).EnsureGuidRepresentationSpecified();
+
+                cfg.MapProperty(x => x.ConversationId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.CorrelationId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.InitiatorId).EnsureGuidRepresentationSpecified();
+                cfg.MapProperty(x => x.RequestId).EnsureGuidRepresentationSpecified();
+            }));
         }
     }
 }

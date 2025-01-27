@@ -6,7 +6,6 @@
     using MassTransit.Serialization;
     using Messages;
     using NUnit.Framework;
-    using Shouldly;
     using TestFramework.Messages;
 
 
@@ -16,6 +15,7 @@
     [TestFixture(typeof(NewtonsoftXmlMessageSerializer))]
     [TestFixture(typeof(EncryptedMessageSerializer))]
     [TestFixture(typeof(EncryptedMessageSerializerV2))]
+    [TestFixture(typeof(MessagePackMessageSerializer))]
     public class Given_a_variety_of_challenging_messages :
         SerializationTest
     {
@@ -32,7 +32,7 @@
 
             var result = SerializeAndReturn(msg);
 
-            result.Contents.SequenceEqual(msg.Contents).ShouldBeTrue();
+            Assert.That(result.Contents, Is.EquivalentTo(msg.Contents));
         }
 
         [Test]

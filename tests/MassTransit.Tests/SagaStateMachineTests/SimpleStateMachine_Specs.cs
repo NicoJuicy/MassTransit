@@ -19,12 +19,12 @@
             await Bus.Publish(new Start { CorrelationId = sagaId });
 
             Guid? saga = await _repository.ShouldContainSaga(sagaId, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
 
             await Bus.Publish(new Stop { CorrelationId = sagaId });
 
             saga = await _repository.ShouldContainSagaInState(sagaId, _machine, x => x.Final, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         [Test]
@@ -36,7 +36,7 @@
 
             Guid? saga = await _repository.ShouldContainSagaInState(sagaId, _machine, x => x.Running, TestTimeout);
 
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -45,7 +45,7 @@
         }
 
         readonly TestStateMachine _machine;
-        readonly InMemorySagaRepository<Instance> _repository;
+        readonly ISagaRepository<Instance> _repository;
 
         public Using_a_simple_state_machine()
         {
@@ -114,7 +114,7 @@
         InMemoryTestFixture
     {
         readonly TestStateMachine _machine;
-        readonly InMemorySagaRepository<Instance> _repository;
+        readonly ISagaRepository<Instance> _repository;
 
         public Using_a_simple_state_machine_with_topology_correlation_id()
         {
@@ -130,12 +130,12 @@
             await Bus.Publish(new Start { CorrelationId = sagaId });
 
             Guid? saga = await _repository.ShouldContainSaga(sagaId, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
 
             await Bus.Publish(new Stop { CorrelationId = sagaId });
 
             saga = await _repository.ShouldContainSagaInState(sagaId, _machine, x => x.Final, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         [Test]
@@ -147,7 +147,7 @@
 
             Guid? saga = await _repository.ShouldContainSagaInState(sagaId, _machine, x => x.Running, TestTimeout);
 
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)
@@ -214,7 +214,7 @@
         InMemoryTestFixture
     {
         readonly TestStateMachine _machine;
-        readonly InMemorySagaRepository<Instance> _repository;
+        readonly ISagaRepository<Instance> _repository;
 
         static Using_a_simple_state_machine_with_custom_correlation_id()
         {
@@ -236,12 +236,12 @@
             await Bus.Publish(new Start { ServiceId = sagaId });
 
             Guid? saga = await _repository.ShouldContainSaga(sagaId, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
 
             await Bus.Publish(new Stop { ServiceId = sagaId });
 
             saga = await _repository.ShouldContainSagaInState(sagaId, _machine, x => x.Final, TestTimeout);
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         [Test]
@@ -253,7 +253,7 @@
 
             Guid? saga = await _repository.ShouldContainSagaInState(sagaId, _machine, x => x.Running, TestTimeout);
 
-            Assert.IsTrue(saga.HasValue);
+            Assert.That(saga.HasValue, Is.True);
         }
 
         protected override void ConfigureInMemoryReceiveEndpoint(IInMemoryReceiveEndpointConfigurator configurator)

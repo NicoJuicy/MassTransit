@@ -5,7 +5,6 @@
     using System.Threading.Tasks;
     using NUnit.Framework;
     using NUnit.Framework.Internal;
-    using Serialization;
     using TestFramework.Messages;
 
 
@@ -17,25 +16,35 @@
         public async Task Should_use_temporary_replyAddress()
         {
             var clientFactory = Bus.CreateClientFactory();
-            RequestHandle<PingMessage> request = clientFactory.CreateRequest(new PingMessage());
+            RequestHandle<PingMessage> request = clientFactory.CreateRequest(new PingMessage(_pingId));
             Response<PongMessage> response = await request.GetResponse<PongMessage>();
 
             TestExecutionContext.CurrentContext.OutWriter.Flush();
 
-            Assert.IsNotNull(response);
-            Assert.NotNull(_replyToAddress);
-            Assert.IsTrue(_replyAddressPattern.IsMatch(_replyToAddress?.ToString()), "Reply address '{0}' does not match desired pattern", _replyToAddress);
+            Assert.Multiple(() =>
+            {
+                Assert.That(response, Is.Not.Null);
+                Assert.That(_replyToAddress, Is.Not.Null);
+                Assert.That(_replyAddressPattern.IsMatch(_replyToAddress?.ToString()), Is.True,
+                    $"Reply address '{_replyToAddress}' does not match desired pattern");
+            });
         }
 
         Uri _replyToAddress;
         readonly Regex _replyAddressPattern = new Regex("ID:[^:]*:[^:]*:[^:]*", RegexOptions.Compiled);
+        Guid _pingId;
 
         protected override void ConfigureActiveMqReceiveEndpoint(IActiveMqReceiveEndpointConfigurator configurator)
         {
+            _pingId = NewId.NextGuid();
+
             TestTimeout = TimeSpan.FromMinutes(5);
             base.ConfigureActiveMqReceiveEndpoint(configurator);
             configurator.Handler<PingMessage>(async context =>
             {
+                if (context.Message.CorrelationId != _pingId)
+                    return;
+
                 _replyToAddress = context.ReceiveContext.TryGetPayload<ActiveMqReceiveContext>(out var payload)
                     ? payload.TransportMessage.NMSReplyTo.ToEndpointAddress()
                     : context.ResponseAddress;
@@ -54,22 +63,32 @@
         public async Task Should_use_temporary_replyAddress()
         {
             var clientFactory = Bus.CreateClientFactory();
-            RequestHandle<PingMessage> request = clientFactory.CreateRequest(new PingMessage());
+            RequestHandle<PingMessage> request = clientFactory.CreateRequest(new PingMessage(_pingId));
             Response<PongMessage> response = await request.GetResponse<PongMessage>();
 
-            Assert.IsNotNull(response);
-            Assert.NotNull(_replyToAddress);
-            Assert.IsTrue(_replyAddressPattern.IsMatch(_replyToAddress?.ToString()), "Reply address '{0}' does not match desired pattern", _replyToAddress);
+            Assert.Multiple(() =>
+            {
+                Assert.That(response, Is.Not.Null);
+                Assert.That(_replyToAddress, Is.Not.Null);
+                Assert.That(_replyAddressPattern.IsMatch(_replyToAddress?.ToString()), Is.True,
+                    $"Reply address '{_replyToAddress}' does not match desired pattern");
+            });
         }
 
         Uri _replyToAddress;
         readonly Regex _replyAddressPattern = new Regex("ID:[^:]*:[^:]*:[^:]*", RegexOptions.Compiled);
+        Guid _pingId;
 
         protected override void ConfigureActiveMqReceiveEndpoint(IActiveMqReceiveEndpointConfigurator configurator)
         {
+            _pingId = NewId.NextGuid();
+
             base.ConfigureActiveMqReceiveEndpoint(configurator);
             configurator.Handler<PingMessage>(async context =>
             {
+                if (context.Message.CorrelationId != _pingId)
+                    return;
+
                 _replyToAddress = context.ReceiveContext.TryGetPayload<ActiveMqReceiveContext>(out var payload)
                     ? payload.TransportMessage.NMSReplyTo.ToEndpointAddress()
                     : context.ResponseAddress;
@@ -82,7 +101,7 @@
         {
             base.ConfigureActiveMqBus(configurator);
 
-            configurator.UseRawJsonSerializer(RawSerializerOptions.AddTransportHeaders, true);
+            configurator.UseRawJsonSerializer();
         }
     }
 }

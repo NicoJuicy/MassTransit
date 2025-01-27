@@ -11,6 +11,8 @@
 
         bool ExclusiveConsumer { get; }
 
-        IModelContextSupervisor ModelContextSupervisor { get; }
+        bool IsNotReplyTo { get; }
+
+        IChannelContextSupervisor ChannelContextSupervisor { get; }
     }
 }
